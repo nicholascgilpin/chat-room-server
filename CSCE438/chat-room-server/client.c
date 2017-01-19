@@ -20,7 +20,9 @@ int main(int argc, char* argv[]){
 
   do{
     sd = socket(AF_INET, SOCK_STREAM, 0);
-    // test error sd<0
+    if (sd<0) {
+      perror("Error: Client couldn't create socket!");
+    }
 
     if(argc>1) strcpy(server,argv[1]);
     else strcpy(server,server_name);
@@ -42,18 +44,27 @@ int main(int argc, char* argv[]){
           }
 
     rc = connect(sd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
-    // test error rc < 0
+    if (rc<0) {
+      perror("Error: Client couldn't connect!");
+    }
 
     memset(buffer, 'a', sizeof(buffer));
     rc = send(sd, buffer, sizeof(buffer), 0);
-    // test error rc < 0
+    if (rc<0) {
+      perror("Error: Client couldn't send message!");
+    }
 
      bytesReceived = 0;
      while (bytesReceived < buffer_length) {
            rc = recv(sd, & buffer[bytesReceived],
                   buffer_length - bytesReceived, 0);
            // test error rc < 0 or rc == 0
-
+           if (rc<0) {
+             perror("Error: Client couldn't recieve message!");
+           }
+           else if (rc == 0) {
+             printf("Client's peer disconneted or sent a 0 byte message!\n");
+           }
             bytesReceived += rc;
       }
 
