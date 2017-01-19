@@ -19,7 +19,9 @@ void main(){
 
   do {
     sd = socket(AF_INET, SOCK_STREAM, 0);
-    // test error: sd<0
+    if (sd < 0) {
+      perror("Error: Server couldn't create master socket!\n");
+    }
 
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
@@ -27,15 +29,21 @@ void main(){
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     rc = bind(sd,(struct sockaddr*) &serveraddr, sizeof(serveraddr));
-    // test error rc<0
+    if (rc<0) {
+      perror("Error: Server couldn't bind master socket!\n");
+    }
 
     rc = listen(sd,10);
-    // test error rc<0
+    if (rc<0) {
+      perror("Error: Server couldn't listen to master socket!");
+    }
 
     printf("Ready for client connect().\n");
 
     sd2 = accept(sd, NULL, NULL);
-    //test error sd2<0
+    if (sd2<0) {
+      perror("Error: Server couldn't accept a master socket connection!");
+    }
 
     timeout.tv_sec = 30;
     timeout.tv_usec = 0;
@@ -44,15 +52,28 @@ void main(){
     FD_SET(sd2, &read_fd);
 
     rc = select(sd2+1, &read_fd, NULL, NULL, &timeout);
-    // test error rc < 0
+    if (rc<0) {
+      perror("Error: Server couldn't select modified file discriptors!");
+    }
 
     int length = buffer_length;
 
     rc = recv(sd2, buffer, sizeof(buffer),0);
-    // test error rc < 0 or rc == 0 or rc < sizeof(buffer)
+    // rc is the number of bytes recieved, assuming everything works
+    if (rc<0) {
+      perror("Error: Server recv failed!");
+    }
+    else if (rc == 0){
+      printf("Server's peer has disconneted or sent a 0 byte message!");
+    }
+    else if (rc > sizeof(buffer)) {
+      perror("Error: Server recieved a message too large to process!");
+    }
 
     rc = send(sd2, buffer, sizeof(buffer), 0);
-    //test error rc < 0
+    if (rc<0) {
+      perror("Error: Server couldn't send message!");
+    }
   }while(FALSE);
 
   if(sd!=-1){
