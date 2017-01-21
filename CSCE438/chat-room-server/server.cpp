@@ -6,8 +6,6 @@
 
 const int server_port = 3005;
 const int buffer_length = 250;
-const int false = 0;
-const int true = 1;
 
 // Database Functions //////////////////////////////////////////////////////////
 typedef struct{
@@ -52,7 +50,7 @@ int rDelete(){
 
 }
 ///////////////////////////////////////////////////////////////////////////////
-void main(){
+int main(){
   int sd=-1, sd2=-1;
   int rc, length, on=1;
   char buffer[buffer_length];

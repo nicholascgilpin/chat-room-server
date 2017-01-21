@@ -1,4 +1,5 @@
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <string.h> //memset
 #include <unistd.h> //close
@@ -7,23 +8,22 @@
 // Constants //////////////////////////////////////////////////////////////////
 const int server_port = 3005;
 const int buffer_length = 250;
-const int FALSE = 0;
 const int NETDB_MAX_HOST_NAME_LENGTH = 512;
 #define server_name "compute.cs.tamu.edu"
 
 // Client Functions ////////////////////////////////////////////////////////////
 // Description: Return -1 for error
-int create(){
+int createRoom(){
 
 }
 
 // Description: Return -1 for error
-int join(){
+int joinRoom(){
 
 }
 
 // Description: Return -1 for error
-int delete(){
+int deleteRoom(){
 
 }
 ///////////////////////////////////////////////////////////////////////////////
@@ -84,7 +84,7 @@ int main(int argc, char* argv[]){
             bytesReceived += rc;
       }
 
-  } while (FALSE);
+  } while (false);
 
       if (sd != -1)
         close(sd);
