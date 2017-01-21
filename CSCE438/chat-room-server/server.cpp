@@ -1,33 +1,36 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h> //memset
+#include <string> // c++ strings
+#include <vector>
 #include <unistd.h> //close
 #include <stdio.h>  //printf
+
+using namespace std;
 
 const int server_port = 3005;
 const int buffer_length = 250;
 
-// Database Functions //////////////////////////////////////////////////////////
-typedef struct{
+class ChatRoom{
   int roomSocketPortNumber;
   int population;
-  char* roomName;
-} chatRoom;
-chatRoom* database;
+  string roomName;
 
+  // Gets the port number of the socket for the chatroom labeld roomName
+  int getPortNum(string roomName){
+    return 0;
+  }
+
+  // Gets the number of people in the chatroom labeld roomName
+  int getPopulation(string roomName){
+    return 0;
+  }
+};
+// Database Functions //////////////////////////////////////////////////////////
+std::vector<ChatRoom> db;
 // Returns true if a room exists in the database
-int roomExists(char* roomName){
+bool roomExists(string roomName){
   return true;
-}
-
-// Gets the port number of the socket for the chatroom labeld roomName
-int getPortNum(char* roomName){
-  return 0;
-}
-
-// Gets the number of people in the chatroom labeld roomName
-int getPopulation(char* roomName){
-  return 0;
 }
 // Server Functions ////////////////////////////////////////////////////////////
 // Description: Return -1 for error
@@ -36,7 +39,7 @@ int rCreate(){
 }
 
 // Description: Return -1 for error
-int rJoin(char* roomName){
+int rJoin(string roomName){
   if(roomExists(roomName)){
     // @TODO: Send room port and population to client
   }
