@@ -6,7 +6,31 @@
 
 const int server_port = 3005;
 const int buffer_length = 250;
-const int FALSE = 0;
+const int false = 0;
+const int true = 1;
+
+// Database Functions //////////////////////////////////////////////////////////
+typedef struct{
+  int roomSocketPortNumber;
+  int population;
+  char* roomName;
+} chatRoom;
+chatRoom* database;
+
+// Returns true if a room exists in the database
+int roomExists(char* roomName){
+  return true;
+}
+
+// Gets the port number of the socket for the chatroom labeld roomName
+int getPortNum(char* roomName){
+  return 0;
+}
+
+// Gets the number of people in the chatroom labeld roomName
+int getPopulation(char* roomName){
+  return 0;
+}
 // Server Functions ////////////////////////////////////////////////////////////
 // Description: Return -1 for error
 int rCreate(){
@@ -14,8 +38,13 @@ int rCreate(){
 }
 
 // Description: Return -1 for error
-int rJoin(){
-
+int rJoin(char* roomName){
+  if(roomExists(roomName)){
+    // @TODO: Send room port and population to client
+  }
+  else{
+    // @TODO: Create room and send info to client
+  }
 }
 
 // Description: Return -1 for error
@@ -89,7 +118,7 @@ void main(){
     if (rc<0) {
       perror("Error: Server couldn't send message!");
     }
-  }while(FALSE);
+  }while(false);
 
   if(sd!=-1){
     close(sd);
