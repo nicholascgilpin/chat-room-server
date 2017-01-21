@@ -11,7 +11,7 @@ const int FALSE = 0;
 const int NETDB_MAX_HOST_NAME_LENGTH = 512;
 #define server_name "compute.cs.tamu.edu"
 
-// Server Functions ////////////////////////////////////////////////////////////
+// Client Functions ////////////////////////////////////////////////////////////
 // Description: Return -1 for error
 int create(){
 
