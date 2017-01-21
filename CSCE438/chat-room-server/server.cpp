@@ -16,14 +16,15 @@ class ChatRoom{
   int population;
   string roomName;
 
+public:
   // Gets the port number of the socket for the chatroom labeld roomName
-  int getPortNum(string roomName){
-    return 0;
+  int getPortNum(){
+    return roomSocketPortNumber;
   }
 
   // Gets the number of people in the chatroom labeld roomName
-  int getPopulation(string roomName){
-    return 0;
+  int getPopulation(){
+    return population;
   }
 };
 // Database Functions //////////////////////////////////////////////////////////
@@ -32,16 +33,21 @@ std::vector<ChatRoom> db;
 bool roomExists(string roomName){
   return true;
 }
+// Returns the room object for roomName
+ChatRoom getRoom(string roomName, std::vector<ChatRoom> rooms){
+  return rooms[0];
+}
 // Server Functions ////////////////////////////////////////////////////////////
 // Description: Return -1 for error
 int rCreate(){
 
 }
 
-// Description: Return -1 for error
+// Sends chatroom socket port and member population size to client for roomName
 int rJoin(string roomName){
   if(roomExists(roomName)){
-    // @TODO: Send room port and population to client
+    ChatRoom temp = getRoom(roomName, db);
+    // send to client
   }
   else{
     // @TODO: Create room and send info to client
