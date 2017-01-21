@@ -44,9 +44,19 @@ bool roomExists(string roomName){
     }
   return exists;
 }
-// Returns the room object for roomName
-ChatRoom getRoom(string roomName, std::vector<ChatRoom> rooms){
-  return rooms[0];
+// Returns the room object for roomName. Doesn't check if room exists!
+ChatRoom getARoom(string roomName, std::vector<ChatRoom> rooms){
+  int roomIndex = -1;
+    for (size_t i = 0; i < db.size(); i++) {
+      string nameX = db[i].getName();
+      if(roomName.compare(nameX) == 0){
+        roomIndex = i;
+      }
+    }
+    if (roomIndex == -1){
+      printf("Server couldn't find room!\n");
+    }
+    return db[roomIndex];
 }
 // Server Functions ////////////////////////////////////////////////////////////
 // Description: Return -1 for error
