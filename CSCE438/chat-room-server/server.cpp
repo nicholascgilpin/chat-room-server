@@ -17,6 +17,10 @@ class ChatRoom{
   string roomName;
 
 public:
+  // gets name of chat roomName
+  string getName(){
+    return roomName;
+  }
   // Gets the port number of the socket for the chatroom labeld roomName
   int getPortNum(){
     return roomSocketPortNumber;
@@ -31,7 +35,14 @@ public:
 std::vector<ChatRoom> db;
 // Returns true if a room exists in the database
 bool roomExists(string roomName){
-  return true;
+  bool exists = false;
+    for (size_t i = 0; i < db.size(); i++) {
+      string nameX = db[i].getName();
+      if(roomName.compare(nameX) == 0){
+        exists = true;
+      }
+    }
+  return exists;
 }
 // Returns the room object for roomName
 ChatRoom getRoom(string roomName, std::vector<ChatRoom> rooms){
