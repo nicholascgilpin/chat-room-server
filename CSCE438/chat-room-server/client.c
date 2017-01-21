@@ -4,13 +4,29 @@
 #include <unistd.h> //close
 #include <stdio.h>  //printf
 
+// Constants //////////////////////////////////////////////////////////////////
 const int server_port = 3005;
 const int buffer_length = 250;
 const int FALSE = 0;
 const int NETDB_MAX_HOST_NAME_LENGTH = 512;
 #define server_name "compute.cs.tamu.edu"
 
+// Server Functions ////////////////////////////////////////////////////////////
+// Description: Return -1 for error
+int create(){
 
+}
+
+// Description: Return -1 for error
+int join(){
+
+}
+
+// Description: Return -1 for error
+int delete(){
+
+}
+///////////////////////////////////////////////////////////////////////////////
 int main(int argc, char* argv[]){
   int sd=-1, rc, bytesReceived;
   char buffer[buffer_length];

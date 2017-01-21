@@ -7,7 +7,22 @@
 const int server_port = 3005;
 const int buffer_length = 250;
 const int FALSE = 0;
+// Server Functions ////////////////////////////////////////////////////////////
+// Description: Return -1 for error
+int rCreate(){
 
+}
+
+// Description: Return -1 for error
+int rJoin(){
+
+}
+
+// Description: Return -1 for error
+int rDelete(){
+
+}
+///////////////////////////////////////////////////////////////////////////////
 void main(){
   int sd=-1, sd2=-1;
   int rc, length, on=1;
