@@ -1,12 +1,29 @@
+// server.cpp
+// Chat Room Server
+// Homework 1
+// Alexandria Stacy and Nicholas Gilpin
+// Due January 27, 2017
+
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h> //memset
-#include <string> // c++ strings
-#include <vector>
 #include <unistd.h> //close
 #include <stdio.h>  //printf
-
+#include"stdlib.h"
+#include"sys/types.h"
+#include <iostream>
+#include"string.h"
+#include <arpa/inet.h>
+#include"netinet/in.h"
+#include"pthread.h"
+#include <stdint.h>
+#include <iostream>
+#include <string.h> //memset
+#include <unistd.h> //close
+#include <stdio.h>  //printf
+#include <cstdlib>
 using namespace std;
+//Disregard all these includes I'll clean them up later I promise -Alex
 
 const int server_port = 3005;
 const int buffer_length = 250;
@@ -79,74 +96,97 @@ int rJoin(string roomName){
 int rDelete(){
 
 }
+
+void * msg(void * socket) {
+ int sd, rc;
+ char buffer[buffer_length]; 
+ sd = *((int*)&socket);
+ memset(buffer, 0, buffer_length);  
+ for (;;) {
+  rc = recvfrom(sd, buffer, buffer_length, 0, NULL, NULL);  
+  if (rc < 0) {  
+   printf("Error receiving data!\n");    
+  } else {
+   printf("client: ");
+   fputs(buffer, stdout);
+   //printf("\n");
+  }  
+ }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 int main(){
-  int sd=-1, sd2=-1;
-  int rc, length, on=1;
-  char buffer[buffer_length];
+	int sd=-1, sd2=-1;
+	int rc, on=1;
+	socklen_t length;
+	char buffer[buffer_length];
+	pthread_t rThread;
+	fd_set read_fd;
+	char client_addr[client_length];
+	struct timeval timeout;
+	struct sockaddr_in serveraddr, clientaddr;
 
-  fd_set read_fd;
-  struct timeval timeout;
-  struct sockaddr_in serveraddr;
 
-  do {
     sd = socket(AF_INET, SOCK_STREAM, 0);
     if (sd < 0) {
       perror("Error: Server couldn't create master socket!\n");
+	  exit(1);
     }
 
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_port = htons(server_port);
-    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
-
+    serveraddr.sin_addr.s_addr = INADDR_ANY;
+	
     rc = bind(sd,(struct sockaddr*) &serveraddr, sizeof(serveraddr));
+	
     if (rc<0) {
       perror("Error: Server couldn't bind master socket!\n");
+	  exit(1);
     }
-
+	printf("Binding done...\n");
+	
     rc = listen(sd,10);
     if (rc<0) {
-      perror("Error: Server couldn't listen to master socket!");
+      perror("Error: Server couldn't listen to master socket!\n");
     }
-
+	
     printf("Ready for client connect().\n");
 
-    sd2 = accept(sd, NULL, NULL);
-    if (sd2<0) {
-      perror("Error: Server couldn't accept a master socket connection!");
-    }
+    sd2 = accept(sd, (struct sockaddr *)&clientaddr, &length);
 
+    if (sd2<0) {
+      perror("Error: Server couldn't accept a master socket connection!\n");
+	  exit(1);
+    }
+	else{
+		printf("Client connected!\n");
+	}
+	
     timeout.tv_sec = 30;
     timeout.tv_usec = 0;
+	
+	inet_ntop(AF_INET, &(clientaddr.sin_addr), client_addr, client_length);
+	printf("Connection accepted from %s...\n", client_addr);
+	
+	memset(buffer, 0, buffer_length);
+	printf("Enter your messages one by one and press return key!\n");
+	
+	 //creating a new thread for receiving messages from the client
+	 rc = pthread_create(&rThread, NULL, msg, (void *) sd2);
+	 if (rc) {
+	  printf("ERROR: Return Code from pthread_create() is %d\n", rc);
+	  exit(1);
+	 }
 
-    FD_ZERO(&read_fd);
-    FD_SET(sd2, &read_fd);
+	 while (fgets(buffer, buffer_length, stdin) != NULL) {
+	  rc = sendto(sd2, buffer, buffer_length, 0, (struct sockaddr *) &clientaddr, length);  
+	  if (rc < 0) {  
+	   printf("Error sending data!\n");  
+	   exit(1);
+	  }
+	 }  
 
-    rc = select(sd2+1, &read_fd, NULL, NULL, &timeout);
-    if (rc<0) {
-      perror("Error: Server couldn't select modified file discriptors!");
-    }
-
-    int length = buffer_length;
-
-    rc = recv(sd2, buffer, sizeof(buffer),0);
-    // rc is the number of bytes recieved, assuming everything works
-    if (rc<0) {
-      perror("Error: Server recv failed!");
-    }
-    else if (rc == 0){
-      printf("Server's peer has disconneted or sent a 0 byte message!");
-    }
-    else if (rc > sizeof(buffer)) {
-      perror("Error: Server recieved a message too large to process!");
-    }
-
-    rc = send(sd2, buffer, sizeof(buffer), 0);
-    if (rc<0) {
-      perror("Error: Server couldn't send message!");
-    }
-  }while(false);
 
   if(sd!=-1){
     close(sd);
@@ -154,4 +194,5 @@ int main(){
   if(sd2!=-1){
     close(sd2);
   }
+  pthread_exit(NULL);
 }
