@@ -102,8 +102,11 @@ int main(int argc, char* argv[]){
 	   }
 		recievingBuffer[sizeof(rbufSize)] = '\0'; // Mark the end of the data for printf
 		printf("Client received: %s\n", recievingBuffer);
+		for (size_t i = 0; i < 10; i++) {
+			sleep(1); // maintain connection for 10 Secs, so that we can test multiple connections
+		}
 // Clean up ///////////////////////////////////////////////////////////////////
-
+			printf("Client: Shutting down!\n");
       if (sd != -1)
         close(sd);
 }
