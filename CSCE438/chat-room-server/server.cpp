@@ -1,3 +1,7 @@
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -7,6 +11,8 @@
 #include <vector>
 #include <unistd.h> //close
 #include <stdio.h>  //printf
+#include <pthread.h>
+#include <resolv.h>
 
 using namespace std;
 
@@ -78,6 +84,38 @@ int rJoin(string roomName){
 int rDelete(){
 
 }
+
+void* SocketHandler(void* lp){
+  int *csock = (int*)lp;
+
+  char buffer[1024];
+  int buffer_len = 1024;
+  int bytecount;
+
+  // memset(buffer, 0, buffer_len);
+
+  while(1){
+    
+    if((bytecount = recv(*csock, buffer, buffer_len, 0))== -1){
+      fprintf(stderr, "Error receiving data");
+      free(csock);
+      return 0;
+    }
+    printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, buffer);
+    strcat(buffer, " ");
+
+    if((bytecount = send(*csock, buffer, strlen(buffer)+1, 0))== -1){
+      fprintf(stderr, "Error sending data");
+      free(csock);
+      return 0;
+    }
+     
+    printf("Sent bytes %d\n", bytecount);
+}
+  free(csock);
+  return 0;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 int main(){
 	int server_port = 3005;
@@ -86,12 +124,14 @@ int main(){
   int rc, length, on=1; 
   char buffer[buffer_length]; // buffer to store incoming message
   fd_set read_fd;
+  int* ssock;
+  sockaddr_in sadr;
   struct timeval timeout;
   struct sockaddr_in serveraddr; // local address
 	struct sockaddr_in clientaddr; // client address
 	uint clientAddrLen; // length of incoming message
 	int recvMsgSize; //size of recieved message
-
+  pthread_t thread_id=0;
 // Start accepting connections ////////////////////////////////////////////////
 
 		// create a master socket to recieve connection requests
@@ -106,7 +146,7 @@ int main(){
 		// The port tells packets which program to go to after entering the copmuter
     serveraddr.sin_port = htons(server_port); 
 		// INADDR_ANY means read to any incoming connections on this computer
-    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serveraddr.sin_addr.s_addr = INADDR_ANY;
 		// htoXX means to flip numbers backwards 100 --> 001 (It's what networks use)
 
 		// If a socket is a mailbox, then bind adds the steet address to the mailbox
@@ -114,13 +154,32 @@ int main(){
     if (rc<0) {
       perror("Error: Server couldn't bind master socket!\n");
     }
+
 		const int backlogSize = 10; 
 		// listen tells the post office that there's an active mailbox here
     rc = listen(masterSD, backlogSize);
     if (rc<0) {
       perror("Error: Server couldn't listen to master socket!");
     }
+
+    socklen_t addr_size = sizeof(sockaddr_in);
 // Stand ready to handle new clients or requests //////////////////////////////
+   while(true){
+    printf("waiting for a connection\n");
+    ssock = (int*)malloc(sizeof(int));
+    if((*ssock = accept(masterSD, (sockaddr*)&sadr, &addr_size))!= -1){
+      printf("---------------------\nReceived connection from %s\n",inet_ntoa(sadr.sin_addr));
+      pthread_create(&thread_id,0,&SocketHandler, (void*)ssock );
+      pthread_detach(thread_id);
+    }
+    else{
+      fprintf(stderr, "Error accepting");
+    }
+  }
+
+
+
+/*
     printf("Server: Ready for client connect().\n");
 		for(;;){
 			// accept() Extracts the first connection
@@ -169,5 +228,5 @@ int main(){
   }
   if(incomingSD!=-1){
     close(incomingSD);
-  }
+  } */
 }
