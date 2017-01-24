@@ -18,15 +18,14 @@
 #include"pthread.h"
 #include <stdint.h>
 #include <iostream>
-#include <string.h> //memset
-#include <unistd.h> //close
-#include <stdio.h>  //printf
+#include <vector>
 #include <cstdlib>
 using namespace std;
 //Disregard all these includes I'll clean them up later I promise -Alex
 
 const int server_port = 3005;
 const int buffer_length = 250;
+const int client_length = 200;
 
 class ChatRoom{
   int roomSocketPortNumber;
@@ -84,7 +83,7 @@ int rCreate(){
 // Sends chatroom socket port and member population size to client for roomName
 int rJoin(string roomName){
   if(roomExists(roomName)){
-    ChatRoom temp = getRoom(roomName, db);
+    ChatRoom temp = getARoom(roomName, db);
     // send to client
   }
   else{
