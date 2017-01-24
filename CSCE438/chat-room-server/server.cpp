@@ -67,7 +67,7 @@ int rCreate(){
 // Sends chatroom socket port and member population size to client for roomName
 int rJoin(string roomName){
   if(roomExists(roomName)){
-    ChatRoom temp = getRoom(roomName, db);
+    ChatRoom temp = getARoom(roomName, db);
     // send to client
   }
   else{
