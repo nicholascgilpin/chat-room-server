@@ -136,7 +136,7 @@ int main(){
 			
 			printf("Server: Client connected!\n");
 			
-			// Reset the message length for new messages
+			// Reset the address size for different clients
 			clientAddrLen = sizeof(clientaddr);
 			
 			// Wait for a message to arrive, copy the message to buffer, copy address to clientaddr
@@ -151,7 +151,8 @@ int main(){
 				perror("Error: Server recieved a message too large to process!");
 			}
 			
-			printf("Server handling client: %s\n", inet_ntoa(clientaddr.sin_addr));
+			printf("Server: handling client: %s\n", inet_ntoa(clientaddr.sin_addr));
+			
 			// Send buffer to the client on socket with id incomingSD
 			rc = send(incomingSD, buffer, sizeof(buffer), 0);
 			// rc is the number of bytes sent
