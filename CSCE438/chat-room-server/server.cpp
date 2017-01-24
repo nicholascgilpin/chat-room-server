@@ -1,5 +1,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <string.h> //memset
 #include <string> // c++ strings
 #include <vector>
@@ -7,9 +9,6 @@
 #include <stdio.h>  //printf
 
 using namespace std;
-
-const int server_port = 3005;
-const int buffer_length = 250;
 
 class ChatRoom{
   int roomSocketPortNumber;
@@ -81,77 +80,93 @@ int rDelete(){
 }
 ///////////////////////////////////////////////////////////////////////////////
 int main(){
-  int sd=-1, sd2=-1;
-  int rc, length, on=1;
-  char buffer[buffer_length];
-
+	int server_port = 3005;
+	int buffer_length = 250;
+  int masterSD=-1, incomingSD=-1; //id's if positive or errors if negative
+  int rc, length, on=1; 
+  char buffer[buffer_length]; // buffer to store incoming message
   fd_set read_fd;
   struct timeval timeout;
-  struct sockaddr_in serveraddr;
+  struct sockaddr_in serveraddr; // local address
+	struct sockaddr_in clientaddr; // client address
+	uint clientAddrLen; // length of incoming message
+	int recvMsgSize; //size of recieved message
 
-  do {
-    sd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sd < 0) {
+// Start accepting connections ////////////////////////////////////////////////
+
+		// create a master socket to recieve connection requests
+    masterSD = socket(AF_INET, SOCK_STREAM, 0);
+    if (masterSD < 0) {
       perror("Error: Server couldn't create master socket!\n");
     }
 
+		// Figure out our address
     memset(&serveraddr, 0, sizeof(serveraddr));
-    serveraddr.sin_family = AF_INET;
-    serveraddr.sin_port = htons(server_port);
+    serveraddr.sin_family = AF_INET; // Use ip addresses with 4 dots
+		// The port tells packets which program to go to after entering the copmuter
+    serveraddr.sin_port = htons(server_port); 
+		// INADDR_ANY means read to any incoming connections on this computer
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+		// htoXX means to flip numbers backwards 100 --> 001 (It's what networks use)
 
-    rc = bind(sd,(struct sockaddr*) &serveraddr, sizeof(serveraddr));
+		// If a socket is a mailbox, then bind adds the steet address to the mailbox
+    rc = bind(masterSD,(struct sockaddr*) &serveraddr, sizeof(serveraddr));
     if (rc<0) {
       perror("Error: Server couldn't bind master socket!\n");
     }
-
-    rc = listen(sd,10);
+		const int backlogSize = 10; 
+		// listen tells the post office that there's an active mailbox here
+    rc = listen(masterSD, backlogSize);
     if (rc<0) {
       perror("Error: Server couldn't listen to master socket!");
     }
+// Stand ready to handle new clients or requests //////////////////////////////
+    printf("Server: Ready for client connect().\n");
+		for(;;){
+			// accept() Extracts the first connection
+			//  request on the queue of pending connections for the listening socket,
+			//  sockfd, creates a new connected socket, and returns a new file
+			//  descriptor referring to that socket.  The newly created socket is not
+			//  in the listening state.  The original socket sockfd is unaffected by
+			//  this call.
+			incomingSD = accept(masterSD, NULL, NULL);
+			if (incomingSD<0) {
+				perror("Error: Server couldn't accept a master socket connection!");
+			}
+			
+			printf("Server: Client connected!\n");
+			
+			// Reset the message length for new messages
+			clientAddrLen = sizeof(clientaddr);
+			
+			// Wait for a message to arrive, copy the message to buffer, copy address to clientaddr
+			recvMsgSize = recvfrom(incomingSD, buffer, sizeof(buffer),0, (struct sockaddr*)&clientaddr, &clientAddrLen);
+			if (recvMsgSize<0) {
+				perror("Error: Server recv failed!");
+			}
+			else if (recvMsgSize == 0){
+				printf("Server's peer has disconneted or sent a 0 byte message!");
+			}
+			else if (recvMsgSize > sizeof(buffer)) {
+				perror("Error: Server recieved a message too large to process!");
+			}
+			
+			printf("Server handling client: %s\n", inet_ntoa(clientaddr.sin_addr));
+			// Send buffer to the client on socket with id incomingSD
+			rc = send(incomingSD, buffer, sizeof(buffer), 0);
+			// rc is the number of bytes sent
+			if (rc<0) {
+				perror("Error: Server couldn't send message!");
+			}
 
-    printf("Ready for client connect().\n");
+		}
+// Clean up code///////////////////////////////////////////////////////////////
+	printf("Server: Shutting down!\n");
 
-    sd2 = accept(sd, NULL, NULL);
-    if (sd2<0) {
-      perror("Error: Server couldn't accept a master socket connection!");
-    }
-
-    timeout.tv_sec = 30;
-    timeout.tv_usec = 0;
-
-    FD_ZERO(&read_fd);
-    FD_SET(sd2, &read_fd);
-
-    rc = select(sd2+1, &read_fd, NULL, NULL, &timeout);
-    if (rc<0) {
-      perror("Error: Server couldn't select modified file discriptors!");
-    }
-
-    int length = buffer_length;
-
-    rc = recv(sd2, buffer, sizeof(buffer),0);
-    // rc is the number of bytes recieved, assuming everything works
-    if (rc<0) {
-      perror("Error: Server recv failed!");
-    }
-    else if (rc == 0){
-      printf("Server's peer has disconneted or sent a 0 byte message!");
-    }
-    else if (rc > sizeof(buffer)) {
-      perror("Error: Server recieved a message too large to process!");
-    }
-
-    rc = send(sd2, buffer, sizeof(buffer), 0);
-    if (rc<0) {
-      perror("Error: Server couldn't send message!");
-    }
-  }while(false);
-
-  if(sd!=-1){
-    close(sd);
+  if(masterSD!=-1){
+    close(masterSD);
   }
-  if(sd2!=-1){
-    close(sd2);
+  if(incomingSD!=-1){
+    close(incomingSD);
   }
 }
