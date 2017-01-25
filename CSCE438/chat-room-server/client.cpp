@@ -38,7 +38,7 @@ int deleteRoom(){
 }
 ///////////////////////////////////////////////////////////////////////////////
 int main(int argc, char* argv[]){
-	int server_port = 4005;
+	int server_port = 5005;
 	int rbufSize; // recieving buffer
 	int NETDB_MAX_HOST_NAME_LENGTH = 512;
 	char* server_name = (char*)"sun.cs.tamu.edu";
@@ -133,7 +133,12 @@ int main(int argc, char* argv[]){
 			     fprintf(stderr, "Error receiving data");
 			     exit(1);
 			 }
-			 
+			 if(packet.type == -1){
+				 printf("Request failed!\n");
+			 }
+			 else if ((packet.type == 1) || packet.type == 2){
+				 printf("Request succeded!\n");
+			 }
 			 printf("Recieved bytes %d\nReceived string \"%s\"\n", bytecount, (Message*)packet.text);
 	}
     

@@ -73,6 +73,32 @@ struct Message{
 	int data; // used to store port number in replies from server
 	char text[1024]; // stores a message or command
 };
+// Returns true if the request was handled successfully
+int runRequest(char* text){
+	char command[6], roomName[80];
+	sscanf(text, "%s %s", command, roomName);
+	text = "Success!";
+	char type = command[1];
+	string display;
+	if (type == 'j') {
+		display = "join";
+		
+	}
+	else if (type == 'c'){
+		display = "create";
+		
+	}
+	else if (type == 'd'){
+		display = "delete";
+		
+	}
+	else{
+		printf("Error: unrecognized client command!\n");
+		return false;
+	}
+	printf("Handling request %s for room %s\n",display.c_str(),roomName);
+	return true;
+}
 // Description: Return -1 for error
 int rCreate(){
 
@@ -80,13 +106,14 @@ int rCreate(){
 
 // Sends chatroom socket port and member population size to client for roomName
 int rJoin(string roomName){
-  if(roomExists(roomName)){
-    ChatRoom temp = getARoom(roomName, db);
-    // send to client
-  }
-  else{
-    // @TODO: Create room and send info to client
-  }
+  // if(roomExists(roomName)){
+  //   ChatRoom temp = getARoom(roomName, db);
+  //   // send to client
+  // }
+  // else{
+  //   // @TODO: Create room and send info to client
+  // }
+  return 0;
 }
 
 // Description: Return -1 for error
@@ -97,13 +124,9 @@ int rDelete(){
 void* SocketHandler(void* lp){
   int *csock = (int*)lp;
 
-  char buffer[1024];
-  int buffer_len = 1024;
   int bytecount;
 	Message packet;
 	int packet_length = sizeof(Message);
-
-  // memset(buffer, 0, buffer_len);
 
   while(1){
     
@@ -113,8 +136,12 @@ void* SocketHandler(void* lp){
       return 0;
     }
     printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
-    strcat(packet.text, " ");
-
+		// Clear text contents and determine request type if not a text message
+		if (packet.type != 0){
+			packet.type = runRequest(packet.text);
+			memset(packet.text, 0, sizeof(packet.text));
+		}
+		
     if((bytecount = send(*csock, &packet, packet_length, 0))== -1){
       fprintf(stderr, "Error sending data");
       free(csock);
@@ -129,7 +156,7 @@ void* SocketHandler(void* lp){
 
 ///////////////////////////////////////////////////////////////////////////////
 int main(){
-	int server_port = 4005;
+	int server_port = 5005;
 	int buffer_length = 250;
   int masterSD=-1, incomingSD=-1; //id's if positive or errors if negative
   int rc, length, on=1; 
