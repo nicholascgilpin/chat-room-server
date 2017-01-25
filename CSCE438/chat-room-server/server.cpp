@@ -15,13 +15,18 @@
 #include <resolv.h>
 
 using namespace std;
-
+int lastUsablePort = 6005;
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
   string roomName;
 
 public:
+	ChatRoom(int roomSock, int pop, string name){
+		roomSocketPortNumber = roomSock;
+		population = pop;
+		roomName = name;
+	}
   // gets name of chat roomName
   string getName(){
     return roomName;
@@ -73,35 +78,43 @@ struct Message{
 	int data; // used to store port number in replies from server
 	char text[1024]; // stores a message or command
 };
-// Returns true if the request was handled successfully
-int runRequest(char* text){
-	char command[6], roomName[80];
-	sscanf(text, "%s %s", command, roomName);
-	text = "Success!";
-	char type = command[1];
-	string display;
-	if (type == 'j') {
-		display = "join";
-		
-	}
-	else if (type == 'c'){
-		display = "create";
-		
-	}
-	else if (type == 'd'){
-		display = "delete";
-		
+
+// Description: Return -1 for error
+int  rCreate(string roomName){
+	int roomSD = -1, status = -1;
+	struct sockaddr_in roomaddr;
+	
+	if(roomExists(roomName)){
+		printf("Room %s found!\n", roomName.c_str());
 	}
 	else{
-		printf("Error: unrecognized client command!\n");
-		return false;
-	}
-	printf("Handling request %s for room %s\n",display.c_str(),roomName);
-	return true;
-}
-// Description: Return -1 for error
-int rCreate(){
+		// Dummy entry code
+		ChatRoom d = ChatRoom(1,2,roomName);
+		db.push_back(d);
+		string dummy = db[0].getName();
+		printf("New room is %s\n", dummy.c_str());
+		printf("Creating room %s\n",roomName.c_str());
+		// create a master socket to recieve connection requests
+		roomSD = socket(AF_INET, SOCK_STREAM, 0);
+		if (roomSD < 0) {
+			perror("Error: Server couldn't create room socket!\n");
+		}
+		memset(&roomaddr, 0, sizeof(roomaddr));
+		roomaddr.sin_family = AF_INET; // Use ip addresses with 4 dots
+		lastUsablePort + 1; //@TODO: Find a better way to create random ports
+		roomaddr.sin_port = lastUsablePort; // Let OS choose port 
+		roomaddr.sin_addr.s_addr = INADDR_ANY;
 
+		// If a socket is a mailbox, then bind adds the steet address to the mailbox
+		status = bind(roomSD,(struct sockaddr*) &roomaddr, sizeof(roomaddr));
+		if (status<0) {
+			perror("Error: Server couldn't bind master socket!\n");
+		}
+		getsockname(roomSD,(struct sockaddr*) &roomaddr, (socklen_t*) sizeof(roomaddr));
+		printf("%d\n",roomaddr.sin_port);
+		// @TODO: Return message struct
+		return -1;
+	}
 }
 
 // Sends chatroom socket port and member population size to client for roomName
@@ -119,6 +132,32 @@ int rJoin(string roomName){
 // Description: Return -1 for error
 int rDelete(){
 
+}
+
+// Returns the message type status of the request
+int runRequest(char* text){
+	char command[6], roomName[80];
+	sscanf(text, "%s %s", command, roomName);
+	char type = command[1];
+	string display;
+	if (type == 'j') {
+		display = "join";
+		
+	}
+	else if (type == 'c'){
+		display = "create";
+		return rCreate(roomName);
+	}
+	else if (type == 'd'){
+		display = "delete";
+		
+	}
+	else{
+		printf("Error: unrecognized client command!\n");
+		return false;
+	}
+	printf("Handling request %s for room %s\n",display.c_str(),roomName);
+	return -1;
 }
 
 void* SocketHandler(void* lp){
@@ -156,7 +195,7 @@ void* SocketHandler(void* lp){
 
 ///////////////////////////////////////////////////////////////////////////////
 int main(){
-	int server_port = 5005;
+	int server_port = lastUsablePort;
 	int buffer_length = 250;
   int masterSD=-1, incomingSD=-1; //id's if positive or errors if negative
   int rc, length, on=1; 
