@@ -13,6 +13,15 @@ using namespace std;
 
 
 // Client Functions ////////////////////////////////////////////////////////////
+struct Message{
+	// -1 = error
+	// 0 = text message
+	// 1 = command success
+	// 2 = success + data (or + command if sent recieved client)
+	int type;
+	int data; // used to store port number in replies from server
+	char text[1024]; // stores a message or command
+};
 // Description: Return -1 for error
 int createRoom(){
 
@@ -29,7 +38,7 @@ int deleteRoom(){
 }
 ///////////////////////////////////////////////////////////////////////////////
 int main(int argc, char* argv[]){
-	int server_port = 3005;
+	int server_port = 4005;
 	int rbufSize; // recieving buffer
 	int NETDB_MAX_HOST_NAME_LENGTH = 512;
 	char* server_name = (char*)"sun.cs.tamu.edu";
@@ -93,26 +102,39 @@ int main(int argc, char* argv[]){
 			\n :join room5\n");
     }
 
+		Message packet;
     while(1){
     	int buffer_length = 1024;
+			int packet_length = sizeof(Message);
     	memset(buffer, '\0', buffer_length);
-
+			packet.data = 0;
+			
     	printf("\nPlease begin typing: ");
     	fgets(buffer, 1024, stdin);
+			buffer[strlen(buffer)-1]='\0';
+			
+			// Let server know to treat message as command or text
+			if (buffer[0] == ':'){
+				packet.type = 2;
+			}
+			else{
+				packet.type = 0;
+			}
+			memcpy(&packet.text, &buffer, buffer_length); // put text in packet
 
-		buffer[strlen(buffer)-1]='\0';
-		 
-		 if( (bytecount=send(sd, buffer, strlen(buffer) + 1, 0))== -1){
-		     fprintf(stderr, "Error sending data");
-		     exit(1);
-		 }
-		 printf("Sent bytes %d\n", bytecount);
+			 
+			 if( (bytecount=send(sd, &packet, packet_length, 0))== -1){
+			     fprintf(stderr, "Error sending data");
+			     exit(1);
+			 }
+			 printf("Sent bytes %d\n", bytecount);
 
-		 if((bytecount = recv(sd, buffer, buffer_length, 0))== -1){
-		     fprintf(stderr, "Error receiving data");
-		     exit(1);
-		 }
-		 printf("Recieved bytes %d\nReceived string \"%s\"\n", bytecount, buffer);
+			 if((bytecount = recv(sd, &packet, packet_length, 0))== -1){
+			     fprintf(stderr, "Error receiving data");
+			     exit(1);
+			 }
+			 
+			 printf("Recieved bytes %d\nReceived string \"%s\"\n", bytecount, (Message*)packet.text);
 	}
     
 /*

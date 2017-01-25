@@ -64,6 +64,15 @@ ChatRoom getARoom(string roomName, std::vector<ChatRoom> rooms){
     return db[roomIndex];
 }
 // Server Functions ////////////////////////////////////////////////////////////
+struct Message{
+	// -1 = error
+	// 0 = text message
+	// 1 = command success
+	// 2 = success + data (or + command if sent recieved client)
+	int type;
+	int data; // used to store port number in replies from server
+	char text[1024]; // stores a message or command
+};
 // Description: Return -1 for error
 int rCreate(){
 
@@ -91,20 +100,22 @@ void* SocketHandler(void* lp){
   char buffer[1024];
   int buffer_len = 1024;
   int bytecount;
+	Message packet;
+	int packet_length = sizeof(Message);
 
   // memset(buffer, 0, buffer_len);
 
   while(1){
     
-    if((bytecount = recv(*csock, buffer, buffer_len, 0))== -1){
+    if((bytecount = recv(*csock, &packet, packet_length, 0))== -1){
       fprintf(stderr, "Error receiving data");
       free(csock);
       return 0;
     }
-    printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, buffer);
-    strcat(buffer, " ");
+    printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
+    strcat(packet.text, " ");
 
-    if((bytecount = send(*csock, buffer, strlen(buffer)+1, 0))== -1){
+    if((bytecount = send(*csock, &packet, packet_length, 0))== -1){
       fprintf(stderr, "Error sending data");
       free(csock);
       return 0;
@@ -118,7 +129,7 @@ void* SocketHandler(void* lp){
 
 ///////////////////////////////////////////////////////////////////////////////
 int main(){
-	int server_port = 3005;
+	int server_port = 4005;
 	int buffer_length = 250;
   int masterSD=-1, incomingSD=-1; //id's if positive or errors if negative
   int rc, length, on=1; 
