@@ -83,9 +83,15 @@ int main(int argc, char* argv[]){
       exit(1);
     }
     else{
-    	printf("Connected to Server!");
+    	printf("Connected to Server!\n");
+			printf("Instructions:\nStart your line with a colon to send a command\n");
+			printf("Availible commands:\
+			\n :join roomname \
+			\n :create roomname \
+			\n :delete roomname\
+			\n Example - Enter a colon, your command, and the roomname \n\
+			\n :join room5\n");
     }
-
 
     while(1){
     	int buffer_length = 1024;
