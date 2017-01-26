@@ -15,7 +15,7 @@
 #include <resolv.h>
 
 using namespace std;
-int lastUsablePort = 9007;
+int lastUsablePort = 9008;
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
@@ -87,7 +87,9 @@ struct Message{
 	int pop;
 	char text[1024]; // stores a message or command
 };
-
+void printPacket(Message *m){
+	printf("type:%d\nport:%d\npopulation:%d\ntext:\n%s\n",m->type,m->port,m->pop,m->text);
+}
 // Creates a room if none exist, then sends the port number to the client
 // @TODO: Make robust by adding mutex lock on db operations and checking port use
 void  rCreate(string roomName, Message* packet){
@@ -141,7 +143,7 @@ void  rCreate(string roomName, Message* packet){
 		memset(packet,0,sizeof(Message));
 		packet->type = status;
 		packet->port = port;
-	}
+		}
 }
 
 // Sends chatroom socket port and member population size to client for roomName
@@ -214,6 +216,9 @@ void* SocketHandler(void* lp){
 		if (packet.type != 0){
 			runRequest(&packet);
 		}
+		
+		printf("Packet immediatly before sending:\n");
+		printPacket(&packet);
 		
     if((bytecount = send(*csock, &packet, packet_length, 0))== -1){
       fprintf(stderr, "Error sending data");
