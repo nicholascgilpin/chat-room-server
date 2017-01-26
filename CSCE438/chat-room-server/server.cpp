@@ -118,7 +118,7 @@ void  rCreate(string roomName, Message* packet){
 		// Critical Section!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 		if (roomExists(roomName)){
 			printf("Create room %s success!\n", roomName.c_str());
-			status = 2;
+			status = 3;
 		}
 		memset(packet,0,sizeof(Message));
 		packet->type = status;
@@ -129,13 +129,15 @@ void  rCreate(string roomName, Message* packet){
 // Sends chatroom socket port and member population size to client for roomName
 void rJoin(string roomName, Message* packet){
   if(roomExists(roomName)){
+		printf("Sending client to %s\n",roomName.c_str());
 		ChatRoom temp = getARoom(roomName, db);
 		packet->port = temp.getPortNum();
 		packet->type = 2;
 		packet->pop = temp.getPopulation();
   }
   else{
-    // @TODO: Create room and send info to client
+		printf("Client cannot join %s because room doesn't exist.\n",roomName.c_str());
+		packet->type = -1;
   }
 }
 
@@ -156,7 +158,7 @@ void runRequest(Message* packet){
 	char type = command[1];
 	if (type == 'j') {
 		printf("Handling join for room %s\n",roomName);	
-
+		rJoin(roomName, packet);
 	}
 	else if (type == 'c'){
 		printf("Handling create for room %s\n",roomName);
