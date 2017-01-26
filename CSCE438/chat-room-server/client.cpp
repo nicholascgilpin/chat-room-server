@@ -149,12 +149,12 @@ int deleteRoom(Message *packet, int sd){
 }
 
 // Description: Return -1 for error
-int joinRoom(Message *packet, int sd){
+int joinRoom(Message *packet){
 	int server_port = packet->port;
 	int rbufSize; // recieving buffer
 	int NETDB_MAX_HOST_NAME_LENGTH = 512;
 	char* server_name = (char*)"sun.cs.tamu.edu";
-	int rc, bytesReceived;
+	int newsd, rc, bytesReceived;
 	char server[NETDB_MAX_HOST_NAME_LENGTH];
 	struct sockaddr_in serveraddr; // server address
 	struct sockaddr_in fromAddr; // address of whoever replies to client
@@ -165,16 +165,20 @@ int joinRoom(Message *packet, int sd){
 	char buffer[1024];	
 	int buffer_length = 0;
 	
-	printf("Initializing socket");
-	close(sd);
+	printf("Initializing socket...\n");
+	newsd = socket(AF_INET, SOCK_STREAM, 0);
+    
+	if (newsd<0) {
+      perror("Error: Client couldn't create socket!");
+      exit(1);
+    }
 	// Figure out client's from address and server to address
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin_family      = AF_INET;
     serveraddr.sin_port        = htons(server_port);
     serveraddr.sin_addr.s_addr = INADDR_ANY;
-   // y_addr.sin_addr.s_addr = INADDR_ANY;
 
-		// Figure out the ip address that matches the url we have
+	// Figure out the ip address that matches the url we have
     if (serveraddr.sin_addr.s_addr == (unsigned long)INADDR_NONE)      {
        hostp = gethostbyname(server);
        if (hostp == (struct hostent *)NULL) {
@@ -186,15 +190,15 @@ int joinRoom(Message *packet, int sd){
                     sizeof(serveraddr.sin_addr));
           }
 
-	printf("Client: connecting...");
-
 	// Request a connection to the server
-    rc = connect(sd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
+    rc = connect(newsd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
     if (rc<0) {
       perror("Error: Client couldn't connect!");
+	  printf("%d, %d, %s, %d", newsd, server_port, server_name, rc);
       exit(1);
     }
     else{
+		printf("Client: connecting...");
     	printf("Connected to new Room!\n");
 			printf("Instructions:\nStart your line with a colon to send a command\n");
 			printf("Availible commands:\
@@ -205,65 +209,10 @@ int joinRoom(Message *packet, int sd){
 			\n :join room5\n");
     }
 	
-	Message joinpacket;
-    while(1){
-    	int buffer_length = 1024;
-		int packet_length = sizeof(Message);
-    	memset(buffer, '\0', buffer_length);
-		joinpacket.port = 0;
-			
-    	printf("\nPlease begin typing: ");
-    	fgets(buffer, 1024, stdin);
-		buffer[strlen(buffer)-1]='\0';
-			
-			// Let server know to treat message as command or text
-			if (buffer[0] == ':'){
-				joinpacket.type = 2;
-			}
-			else{
-				joinpacket.type = 0;
-			}
-			memcpy(&joinpacket.text, &buffer, buffer_length); // put text in packet
-
-			 
-			 if( (bytecount=send(sd, &joinpacket, packet_length, 0))== -1){
-			     fprintf(stderr, "Error sending data");
-			     exit(1);
-			 }
-			 printf("Sent bytes %d\n", bytecount);
-
-			 if((bytecount = recv(sd, &joinpacket, packet_length, 0))== -1){
-			     fprintf(stderr, "Error receiving data");
-			     exit(1);
-			 }
-			 if(joinpacket.type == -1){
-				 printf("Request failed!\n");
-			 }
-			 else if ((joinpacket.type == 1) || joinpacket.type == 2 || joinpacket.type == 3){
-				 printf("Request succeeded!\n");
-				 switch(joinpacket.type){
-					 case 1:
-						deleteRoom(&joinpacket, sd);
-						break;
-					 case 2:
-						joinRoom(&joinpacket, sd);
-						break;
-					 case 3:
-						printf("Creating room at port: %d", packet->port);
-						break;
-					default:
-						printf( "Packet out of range: %d", joinpacket.type);
-						break;
-			 }
-			 printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*)joinpacket.text);
-		}
-	}
-
-// Clean up ///////////////////////////////////////////////////////////////////
-	printf("Client: Shutting down!\n");
-	if (sd != -1)
-		close(sd);
 }
+
+
+
 //////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char* argv[]){
@@ -333,6 +282,7 @@ int main(int argc, char* argv[]){
 
 	Message packet;
     while(1){
+		printf("Top of while.");
     	int buffer_length = 1024;
 		int packet_length = sizeof(Message);
     	memset(buffer, '\0', buffer_length);
@@ -372,7 +322,9 @@ int main(int argc, char* argv[]){
 						deleteRoom(&packet, sd);
 						break;
 					 case 2:
-						joinRoom(&packet, sd);
+						printf("Client: Leaving Master Server! Joining room at: %d\n", packet.port);
+						close(sd);
+						joinRoom(&packet);
 						break;
 					 case 3:
 						printf("Creating room at port: %d\n", packet.port); 
@@ -380,7 +332,7 @@ int main(int argc, char* argv[]){
 					default:
 						printf( "Packet out of range: %d\n", packet.type);
 			 }
-			 printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*)packet.text);
+			 printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, packet.text);
 		}
 	}
 

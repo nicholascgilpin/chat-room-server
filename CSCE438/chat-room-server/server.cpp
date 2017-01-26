@@ -15,7 +15,7 @@
 #include <resolv.h>
 
 using namespace std;
-int lastUsablePort = 9009;
+int lastUsablePort = 6005;
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
@@ -54,6 +54,8 @@ bool roomExists(string roomName){
     }
   return exists;
 }
+
+
 // Returns the room object for roomName. Doesn't check if room exists!
 ChatRoom getARoom(string roomName, std::vector<ChatRoom> rooms){
   int roomIndex = -1;
@@ -90,11 +92,51 @@ struct Message{
 void printPacket(Message *m){
 	printf("type:%d\nport:%d\npopulation:%d\ntext:\n%s\n",m->type,m->port,m->pop,m->text);
 }
+
+void runRequest(Message* packet);
+
+void* SocketHandler(void* lp){
+  int *csock = (int*)lp;
+
+  int bytecount;
+	Message packet;
+	int packet_length = sizeof(Message);
+
+  while(1){
+    
+    if((bytecount = recv(*csock, &packet, packet_length, 0))== -1){
+      fprintf(stderr, "Error receiving data");
+      free(csock);
+      return 0;
+    }
+    printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
+		// Clear text contents and handle request if not a text message
+		if (packet.type != 0){
+			runRequest(&packet);
+		}
+		
+		printf("Packet immediatly before sending:\n");
+		printPacket(&packet);
+		
+    if((bytecount = send(*csock, &packet, packet_length, 0))== -1){
+      fprintf(stderr, "Error sending data");
+      free(csock);
+      return 0;
+    }
+     
+    printf("Sent bytes %d\n", bytecount);
+}
+  free(csock);
+  return 0;
+}
+
 // Creates a room if none exist, then sends the port number to the client
 // @TODO: Make robust by adding mutex lock on db operations and checking port use
 void  rCreate(string roomName, Message* packet){
 	int roomSD = -1, status = -1, port = -1, population = 0;
+	int* ssock;
 	struct sockaddr_in roomaddr;
+	pthread_t thread_id=0;
 	
 	if(roomExists(roomName)){
 		printf("Room %s found!\n", roomName.c_str());
@@ -119,7 +161,7 @@ void  rCreate(string roomName, Message* packet){
 		memset(&roomaddr, 0, sizeof(roomaddr));
 		roomaddr.sin_family = AF_INET;
 		lastUsablePort += 1;
-		roomaddr.sin_port = lastUsablePort;
+		roomaddr.sin_port = htons(lastUsablePort);
 		roomaddr.sin_addr.s_addr = INADDR_ANY;
 
 		// If a socket is a mailbox, then bind adds the steet address to the mailbox
@@ -153,7 +195,22 @@ void  rCreate(string roomName, Message* packet){
 		memset(packet,0,sizeof(Message));
 		packet->type = status;
 		packet->port = port;
-		}
+		
+		socklen_t addr_size = sizeof(roomaddr);
+		
+	    while(true){
+			printf("waiting for a connection\n");
+			ssock = (int*)malloc(sizeof(int));
+			if(*ssock = accept(roomSD, (sockaddr*)&roomaddr, &addr_size)!= -1){
+			  printf("---------------------\nReceived connection from %s\n",inet_ntoa(roomaddr.sin_addr));
+			  pthread_create(&thread_id,0,&SocketHandler, (void*)ssock );
+			  pthread_detach(thread_id);
+			}
+			else{
+			  fprintf(stderr, "Error accepting");
+			}
+	  }
+	}
 }
 
 // Sends chatroom socket port and member population size to client for roomName
@@ -205,41 +262,6 @@ void runRequest(Message* packet){
 		memset(packet,0,sizeof(Message));
 		packet->type = -1;
 	}
-}
-
-void* SocketHandler(void* lp){
-  int *csock = (int*)lp;
-
-  int bytecount;
-	Message packet;
-	int packet_length = sizeof(Message);
-
-  while(1){
-    
-    if((bytecount = recv(*csock, &packet, packet_length, 0))== -1){
-      fprintf(stderr, "Error receiving data");
-      free(csock);
-      return 0;
-    }
-    printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
-		// Clear text contents and hendle request if not a text message
-		if (packet.type != 0){
-			runRequest(&packet);
-		}
-		
-		printf("Packet immediatly before sending:\n");
-		printPacket(&packet);
-		
-    if((bytecount = send(*csock, &packet, packet_length, 0))== -1){
-      fprintf(stderr, "Error sending data");
-      free(csock);
-      return 0;
-    }
-     
-    printf("Sent bytes %d\n", bytecount);
-}
-  free(csock);
-  return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
