@@ -15,7 +15,7 @@
 #include <resolv.h>
 
 using namespace std;
-int lastUsablePort = 6005;
+int lastUsablePort = 7005;
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
@@ -102,16 +102,21 @@ void  rCreate(string roomName, Message* packet){
 			perror("Error: Server couldn't create room socket!\n");
 		}
 		memset(&roomaddr, 0, sizeof(roomaddr));
-		roomaddr.sin_family = AF_INET; // Use ip addresses with 4 dots
-		lastUsablePort + 1; //@TODO: Find a better way to create random ports
-		roomaddr.sin_port = lastUsablePort; 
+		roomaddr.sin_family = AF_INET;
+		lastUsablePort + 1;
+		roomaddr.sin_port = lastUsablePort;
 		roomaddr.sin_addr.s_addr = INADDR_ANY;
 
 		// If a socket is a mailbox, then bind adds the steet address to the mailbox
-		status = bind(roomSD,(struct sockaddr*) &roomaddr, sizeof(roomaddr));
-		if (status<0) {
-			perror("Error: Server couldn't bind master socket!\n");
+		for (size_t i = 0; i < 100; i++) {
+			status = bind(roomSD,(struct sockaddr*) &roomaddr, sizeof(roomaddr));
+			if (status<0) {
+				break;
+			}
+			lastUsablePort + 1;
+			roomaddr.sin_port = lastUsablePort;
 		}
+		port = lastUsablePort;
 		// Critical Section!///////////////////////////////////////////////////////
 		ChatRoom d = ChatRoom(roomSD,population,roomName);
 		db.push_back(d);
