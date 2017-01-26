@@ -179,7 +179,7 @@ void  rCreate(string roomName, Message* packet){
 				break;
 			}
 			lastUsablePort += 1;
-			roomaddr.sin_port = lastUsablePort;
+			roomaddr.sin_port = htons(lastUsablePort);
 		}
 		status = -1;
 		status = listen(roomSD, 10);
@@ -321,7 +321,7 @@ int main(){
     socklen_t addr_size = sizeof(sockaddr_in);
 // Stand ready to handle new clients or requests //////////////////////////////
    while(true){
-    printf("waiting for a connection\n");
+    printf("waiting for a connection on port %d\n", server_port);
     ssock = (int*)malloc(sizeof(int));
     if((*ssock = accept(masterSD, (sockaddr*)&sadr, &addr_size))!= -1){
       printf("---------------------\nReceived connection from %s\n",inet_ntoa(sadr.sin_addr));
