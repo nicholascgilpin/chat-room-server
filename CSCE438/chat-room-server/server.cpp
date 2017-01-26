@@ -79,20 +79,20 @@ struct Message{
 	char text[1024]; // stores a message or command
 };
 
-// Description: Return -1 for error
-int  rCreate(string roomName){
-	int roomSD = -1, status = -1;
+// Creates a room if none exist, then sends the port number to the client
+// @TODO: Make robust by adding mutex lock on db operations and checking port use
+void  rCreate(string roomName, Message* packet){
+	int roomSD = -1, status = -1, port = -1, population = 0;
 	struct sockaddr_in roomaddr;
 	
 	if(roomExists(roomName)){
 		printf("Room %s found!\n", roomName.c_str());
+		memset(&packet,0,sizeof(Message));
+		ChatRoom c = getARoom(roomName, db);
+		packet->data = c.getPortNum();
+		packet->type = 2;
 	}
 	else{
-		// Dummy entry code
-		ChatRoom d = ChatRoom(1,2,roomName);
-		db.push_back(d);
-		string dummy = db[0].getName();
-		printf("New room is %s\n", dummy.c_str());
 		printf("Creating room %s\n",roomName.c_str());
 		// create a master socket to recieve connection requests
 		roomSD = socket(AF_INET, SOCK_STREAM, 0);
@@ -102,7 +102,7 @@ int  rCreate(string roomName){
 		memset(&roomaddr, 0, sizeof(roomaddr));
 		roomaddr.sin_family = AF_INET; // Use ip addresses with 4 dots
 		lastUsablePort + 1; //@TODO: Find a better way to create random ports
-		roomaddr.sin_port = lastUsablePort; // Let OS choose port 
+		roomaddr.sin_port = lastUsablePort; 
 		roomaddr.sin_addr.s_addr = INADDR_ANY;
 
 		// If a socket is a mailbox, then bind adds the steet address to the mailbox
@@ -110,10 +110,17 @@ int  rCreate(string roomName){
 		if (status<0) {
 			perror("Error: Server couldn't bind master socket!\n");
 		}
-		getsockname(roomSD,(struct sockaddr*) &roomaddr, (socklen_t*) sizeof(roomaddr));
-		printf("%d\n",roomaddr.sin_port);
-		// @TODO: Return message struct
-		return -1;
+		// Critical Section!///////////////////////////////////////////////////////
+		ChatRoom d = ChatRoom(roomSD,population,roomName);
+		db.push_back(d);
+		// Critical Section!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+		if (roomExists(roomName)){
+			printf("Create room %s success!\n", roomName.c_str());
+			status = 2;
+		}
+		memset(packet,0,sizeof(Message));
+		packet->type = status;
+		packet->data = port;
 	}
 }
 
@@ -135,29 +142,26 @@ int rDelete(){
 }
 
 // Returns the message type status of the request
-int runRequest(char* text){
+void runRequest(Message* packet){
 	char command[6], roomName[80];
-	sscanf(text, "%s %s", command, roomName);
+	sscanf(packet->text, "%s %s", command, roomName);
 	char type = command[1];
-	string display;
 	if (type == 'j') {
-		display = "join";
-		
+		printf("Handling join for room %s\n",roomName);	
+
 	}
 	else if (type == 'c'){
-		display = "create";
-		return rCreate(roomName);
+		printf("Handling create for room %s\n",roomName);
+		rCreate(roomName, packet);
 	}
 	else if (type == 'd'){
-		display = "delete";
-		
+		printf("Handling delete for room %s\n",roomName);
 	}
 	else{
-		printf("Error: unrecognized client command!\n");
-		return false;
+		printf("Error: unrecognized client command %s!\n", type);
+		memset(packet,0,sizeof(Message));
+		packet->type = -1;
 	}
-	printf("Handling request %s for room %s\n",display.c_str(),roomName);
-	return -1;
 }
 
 void* SocketHandler(void* lp){
@@ -175,9 +179,9 @@ void* SocketHandler(void* lp){
       return 0;
     }
     printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
-		// Clear text contents and determine request type if not a text message
+		// Clear text contents and hendle request if not a text message
 		if (packet.type != 0){
-			packet.type = runRequest(packet.text);
+			runRequest(&packet);
 			memset(packet.text, 0, sizeof(packet.text));
 		}
 		
