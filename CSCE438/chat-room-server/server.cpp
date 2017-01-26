@@ -176,17 +176,17 @@ void runRequest(Message* packet){
 	char type = command[1];
 	if (type == 'j') {
 		printf("Handling join for room %s\n",roomName);
-		memset(packet->text, 0, sizeof(packet->text));	
+		memset(packet, 0, sizeof(Message));	
 		rJoin(roomName, packet);
 	}
 	else if (type == 'c'){
 		printf("Handling create for room %s\n",roomName);
-		memset(packet->text, 0, sizeof(packet->text));
+		memset(packet, 0, sizeof(Message));
 		rCreate(roomName, packet);
 	}
 	else if (type == 'd'){
 		printf("Handling delete for room %s\n",roomName);
-		memset(packet->text, 0, sizeof(packet->text));
+		memset(packet, 0, sizeof(Message));
 	}
 	else{
 		printf("Error: unrecognized client command %s!\n", type);
