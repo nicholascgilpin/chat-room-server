@@ -104,27 +104,35 @@ void* SocketHandler(void* lp){
 
   while(1){
     
-    if((bytecount = recv(*csock, &packet, packet_length, 0))== -1){
-      fprintf(stderr, "Error receiving data");
-      free(csock);
-      return 0;
-    }
-    printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
-		// Clear text contents and handle request if not a text message
-		if (packet.type != 0){
-			runRequest(&packet);
+    bytecount = recv(*csock, &packet, packet_length, 0);
+		if (bytecount<0) {
+			perror("Error: Server recv failed!\n");
+			free(csock);
+			return 0;
 		}
-		
-		printf("Packet immediatly before sending:\n");
-		printPacket(&packet);
-		
-    if((bytecount = send(*csock, &packet, packet_length, 0))== -1){
-      fprintf(stderr, "Error sending data");
-      free(csock);
-      return 0;
-    }
-     
-    printf("Sent bytes %d\n", bytecount);
+		else if (bytecount == 0){
+			//printf("Server's peer has disconneted or sent a 0 byte message!\n");
+		}
+		else if (bytecount > sizeof(Message)) {
+			perror("Error: Server recieved a message too large to process!\n");
+		}
+		else{
+			printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
+			// Clear text contents and handle request if not a text message
+			if (packet.type != 0){
+				runRequest(&packet);
+			}
+			printf("Packet immediatly before sending:\n");
+			printPacket(&packet);
+			
+			if((bytecount = send(*csock, &packet, packet_length, 0))== -1){
+				fprintf(stderr, "Error sending data");
+				free(csock);
+				return 0;
+			}
+			 
+			printf("Sent bytes %d\n", bytecount);
+		}
 }
   free(csock);
   return 0;
