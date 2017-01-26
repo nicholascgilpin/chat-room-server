@@ -216,7 +216,7 @@ int joinRoom(Message *packet){
 //////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char* argv[]){
-	int server_port = 6005;
+	int server_port = 7005;
 	int rbufSize; // recieving buffer
 	int NETDB_MAX_HOST_NAME_LENGTH = 512;
 	char* server_name = (char*)"sun.cs.tamu.edu";

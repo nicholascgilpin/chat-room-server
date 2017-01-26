@@ -15,7 +15,7 @@
 #include <resolv.h>
 
 using namespace std;
-int lastUsablePort = 6005;
+int lastUsablePort = 7005;
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
@@ -140,16 +140,21 @@ void* SocketHandler(void* lp){
 
 // Room handler manages operations for a room (accepting and message distibuting)
 void* RoomHandler(void* socketFD){
-	int* roomMasterSD = (int*) socketFD;
+	int roomMasterSD = *((int *)socketFD);
+	int* ssock; //Writing to this after accept will send message to client
 	socklen_t addr_size = sizeof(sockaddr_in);
 	struct sockaddr_in clientaddr; // client address to be filled in by accept
+	sockaddr_in sadr;
+	pthread_t thread_id=0;
 
 	while(true){
-		int clientSD = -1; //Writing to this after accept will send message to client
 		printf("Room thread (not main server) waiting to accept join connection\n");
-		if(clientSD = accept(*roomMasterSD, (sockaddr*)&clientaddr, &addr_size)!= -1){
-			printf("---------------------\nReceived connection from %s\n",inet_ntoa(clientaddr.sin_addr));
-		}
+    	ssock = (int*)malloc(sizeof(int));
+	    if((*ssock = accept(roomMasterSD, (sockaddr*)&sadr, &addr_size))!= -1){
+	      printf("---------------------\nReceived connection from %s\n",inet_ntoa(sadr.sin_addr));
+	      pthread_create(&thread_id,0,&SocketHandler, (void*)ssock );
+	      pthread_detach(thread_id);
+	    }
 		else{
 			printf("Error: Room failed accepting\n%s\n", strerror(errno));
 			break;
@@ -185,7 +190,9 @@ void  rCreate(string roomName, Message* packet){
 		}
 		memset(&roomaddr, 0, sizeof(roomaddr));
 		roomaddr.sin_family = AF_INET;
-		lastUsablePort += 1;
+		lastUsablePort = lastUsablePort + 1;
+		printf("lastUsablePort is: %d", lastUsablePort);
+
 		roomaddr.sin_port = htons(lastUsablePort);
 		roomaddr.sin_addr.s_addr = INADDR_ANY;
 
@@ -195,7 +202,7 @@ void  rCreate(string roomName, Message* packet){
 			if (status<0) {
 				break;
 			}
-			lastUsablePort += 1;
+			//lastUsablePort += 1;
 			roomaddr.sin_port = htons(lastUsablePort);
 		}
 		status = -1;
@@ -204,8 +211,11 @@ void  rCreate(string roomName, Message* packet){
 			perror("Error: Room couldn't listen to socket!");
 		}
 		port = lastUsablePort;
+
 		// Critical Section!///////////////////////////////////////////////////////
 		ChatRoom d = ChatRoom(port,population,roomName);
+		printf("\nChatRoom's Port outside db: %d\n", d.getPortNum());
+
 		db.push_back(d);
 		printf("In db:\n");
 		ChatRoom r = getARoom(roomName,db);
@@ -236,7 +246,7 @@ void rJoin(string roomName, Message* packet){
 		ChatRoom temp = getARoom(roomName, db);
 		packet->port = temp.getPortNum();
 		packet->type = 2;
-		packet->pop = temp.getPopulation();
+		packet->pop = 1 + temp.getPopulation();
   }
   else{
 		printf("Client cannot join %s because room doesn't exist.\n",roomName.c_str());
@@ -284,18 +294,18 @@ void runRequest(Message* packet){
 int main(){
 	int server_port = lastUsablePort;
 	int buffer_length = 250;
-  int masterSD=-1, incomingSD=-1; //id's if positive or errors if negative
-  int rc, length, on=1; 
-  char buffer[buffer_length]; // buffer to store incoming message
-  fd_set read_fd;
-  int* ssock;
-  sockaddr_in sadr;
-  struct timeval timeout;
-  struct sockaddr_in serveraddr; // local address
+	int masterSD=-1, incomingSD=-1; //id's if positive or errors if negative
+	int rc, length, on=1; 
+	char buffer[buffer_length]; // buffer to store incoming message
+	fd_set read_fd;
+	int* ssock;
+	sockaddr_in sadr;
+	struct timeval timeout;
+	struct sockaddr_in serveraddr; // local address
 	// struct sockaddr_in clientaddr; // client address
 	uint clientAddrLen; // length of incoming message
 	int recvMsgSize; //size of recieved message
-  pthread_t thread_id=0;
+	pthread_t thread_id=0;
 // Start accepting connections ////////////////////////////////////////////////
 
 		// create a master socket to recieve connection requests
