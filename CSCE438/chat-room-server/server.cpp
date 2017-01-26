@@ -15,7 +15,7 @@
 #include <resolv.h>
 
 using namespace std;
-int lastUsablePort = 9008;
+int lastUsablePort = 9009;
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
@@ -131,10 +131,20 @@ void  rCreate(string roomName, Message* packet){
 			lastUsablePort += 1;
 			roomaddr.sin_port = lastUsablePort;
 		}
+		status = -1;
+		status = listen(roomSD, 10);
+		if (status<0) {
+			perror("Error: Room couldn't listen to socket!");
+		}
 		port = lastUsablePort;
 		// Critical Section!///////////////////////////////////////////////////////
-		ChatRoom d = ChatRoom(roomSD,population,roomName);
+		ChatRoom d = ChatRoom(port,population,roomName);
 		db.push_back(d);
+		printf("In db:\n");
+		ChatRoom r = getARoom(roomName,db);
+		printf("%d\n",r.getPortNum() );
+		printf("%d\n",r.getPopulation() );
+		printf("%s\n",r.getName().c_str());
 		// Critical Section!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 		if (roomExists(roomName)){
 			printf("Create room %s success!\n", roomName.c_str());
