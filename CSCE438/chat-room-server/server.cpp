@@ -138,11 +138,28 @@ void* SocketHandler(void* lp){
   return 0;
 }
 
+// Room handler manages operations for a room (accepting and message distibuting)
+void* RoomHandler(void* socketFD){
+	int* roomMasterSD = (int*) socketFD;
+	socklen_t addr_size = sizeof(sockaddr_in);
+	struct sockaddr_in clientaddr; // client address to be filled in by accept
+
+	while(true){
+		int clientSD = -1; //Writing to this after accept will send message to client
+		printf("Room thread (not main server) waiting to accept join connection\n");
+		if(clientSD = accept(*roomMasterSD, (sockaddr*)&clientaddr, &addr_size)!= -1){
+			printf("---------------------\nReceived connection from %s\n",inet_ntoa(clientaddr.sin_addr));
+		}
+		else{
+			printf("Error: Room failed accepting\n%s\n", strerror(errno));
+			break;
+		}
+	}
+}
 // Creates a room if none exist, then sends the port number to the client
 // @TODO: Make robust by adding mutex lock on db operations and checking port use
 void  rCreate(string roomName, Message* packet){
 	int roomSD = -1, status = -1, port = -1, population = 0;
-	int* ssock;
 	struct sockaddr_in roomaddr;
 	pthread_t thread_id=0;
 	
@@ -204,20 +221,11 @@ void  rCreate(string roomName, Message* packet){
 		packet->type = status;
 		packet->port = port;
 		
-		socklen_t addr_size = sizeof(roomaddr);
-		
-	    while(true){
-			printf("waiting for a connection\n");
-			ssock = (int*)malloc(sizeof(int));
-			if(*ssock = accept(roomSD, (sockaddr*)&roomaddr, &addr_size)!= -1){
-			  printf("---------------------\nReceived connection from %s\n",inet_ntoa(roomaddr.sin_addr));
-			  pthread_create(&thread_id,0,&SocketHandler, (void*)ssock );
-			  pthread_detach(thread_id);
-			}
-			else{
-			  fprintf(stderr, "Error accepting");
-			}
-	  }
+		// Create a thread to accept connections to this room's socket
+		int* threadPassableSD = (int*)malloc(sizeof(int));
+		*threadPassableSD = roomSD;
+		pthread_create(&thread_id,0,&RoomHandler, (void*)threadPassableSD );
+		pthread_detach(thread_id);
 	}
 }
 
@@ -284,7 +292,7 @@ int main(){
   sockaddr_in sadr;
   struct timeval timeout;
   struct sockaddr_in serveraddr; // local address
-	struct sockaddr_in clientaddr; // client address
+	// struct sockaddr_in clientaddr; // client address
 	uint clientAddrLen; // length of incoming message
 	int recvMsgSize; //size of recieved message
   pthread_t thread_id=0;
