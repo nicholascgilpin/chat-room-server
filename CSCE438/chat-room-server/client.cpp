@@ -16,10 +16,12 @@ using namespace std;
 struct Message{
 	// -1 = error
 	// 0 = text message
-	// 1 = command success
-	// 2 = success + data (or + command if sent recieved client)
+	// 1 = delete
+	// 2 = join success
+	// 3 = create sucess
 	int type;
-	int data; // used to store port number in replies from server
+	int port; // used to store port number in replies from server
+	int pop;
 	char text[1024]; // stores a message or command
 };
 // Description: Return -1 for error
@@ -107,7 +109,7 @@ int main(int argc, char* argv[]){
     	int buffer_length = 1024;
 			int packet_length = sizeof(Message);
     	memset(buffer, '\0', buffer_length);
-			packet.data = 0;
+			packet.port = 0;
 			
     	printf("\nPlease begin typing: ");
     	fgets(buffer, 1024, stdin);
@@ -136,7 +138,7 @@ int main(int argc, char* argv[]){
 			 if(packet.type == -1){
 				 printf("Request failed!\n");
 			 }
-			 else if ((packet.type == 1) || packet.type == 2){
+			 else if ((packet.type == 1) || packet.type == 2 || packet.type == 3){
 				 printf("Request succeded!\n");
 			 }
 			 printf("Recieved bytes %d\nReceived string \"%s\"\n", bytecount, (Message*)packet.text);

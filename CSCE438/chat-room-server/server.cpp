@@ -72,10 +72,12 @@ ChatRoom getARoom(string roomName, std::vector<ChatRoom> rooms){
 struct Message{
 	// -1 = error
 	// 0 = text message
-	// 1 = command success
-	// 2 = success + data (or + command if sent recieved client)
+	// 1 = delete
+	// 2 = join success
+	// 3 = create sucess
 	int type;
-	int data; // used to store port number in replies from server
+	int port; // used to store port number in replies from server
+	int pop;
 	char text[1024]; // stores a message or command
 };
 
@@ -89,7 +91,7 @@ void  rCreate(string roomName, Message* packet){
 		printf("Room %s found!\n", roomName.c_str());
 		memset(&packet,0,sizeof(Message));
 		ChatRoom c = getARoom(roomName, db);
-		packet->data = c.getPortNum();
+		packet->port = c.getPortNum();
 		packet->type = 2;
 	}
 	else{
@@ -120,25 +122,31 @@ void  rCreate(string roomName, Message* packet){
 		}
 		memset(packet,0,sizeof(Message));
 		packet->type = status;
-		packet->data = port;
+		packet->port = port;
 	}
 }
 
 // Sends chatroom socket port and member population size to client for roomName
-int rJoin(string roomName){
-  // if(roomExists(roomName)){
-  //   ChatRoom temp = getARoom(roomName, db);
-  //   // send to client
-  // }
-  // else{
-  //   // @TODO: Create room and send info to client
-  // }
-  return 0;
+void rJoin(string roomName, Message* packet){
+  if(roomExists(roomName)){
+		ChatRoom temp = getARoom(roomName, db);
+		packet->port = temp.getPortNum();
+		packet->type = 2;
+		packet->pop = temp.getPopulation();
+  }
+  else{
+    // @TODO: Create room and send info to client
+  }
 }
 
 // Description: Return -1 for error
-int rDelete(){
+void rDelete(string roomName, Message* packet){
+	if(roomExists(roomName)){
 
+  }
+  else{
+    // @TODO: Create room and send info to client
+  }
 }
 
 // Returns the message type status of the request
