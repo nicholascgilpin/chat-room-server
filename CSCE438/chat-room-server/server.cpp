@@ -15,7 +15,7 @@
 #include <resolv.h>
 
 using namespace std;
-int lastUsablePort = 7005;
+int lastUsablePort = 9005;
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
@@ -89,10 +89,16 @@ void  rCreate(string roomName, Message* packet){
 	
 	if(roomExists(roomName)){
 		printf("Room %s found!\n", roomName.c_str());
-		memset(&packet,0,sizeof(Message));
 		ChatRoom c = getARoom(roomName, db);
 		packet->port = c.getPortNum();
 		packet->type = 2;
+		string s = " already exists";
+		string catted = roomName + s;
+		const char * msg = catted.c_str();
+		char buffer[1024];
+		memset(buffer,0,1024);
+		strncpy(buffer,msg,1024 -1);
+		memcpy(packet->text,buffer,1024);
 	}
 	else{
 		printf("Creating room %s\n",roomName.c_str());
@@ -162,15 +168,18 @@ void runRequest(Message* packet){
 	sscanf(packet->text, "%s %s", command, roomName);
 	char type = command[1];
 	if (type == 'j') {
-		printf("Handling join for room %s\n",roomName);	
+		printf("Handling join for room %s\n",roomName);
+		memset(packet->text, 0, sizeof(packet->text));	
 		rJoin(roomName, packet);
 	}
 	else if (type == 'c'){
 		printf("Handling create for room %s\n",roomName);
+		memset(packet->text, 0, sizeof(packet->text));
 		rCreate(roomName, packet);
 	}
 	else if (type == 'd'){
 		printf("Handling delete for room %s\n",roomName);
+		memset(packet->text, 0, sizeof(packet->text));
 	}
 	else{
 		printf("Error: unrecognized client command %s!\n", type);
@@ -197,7 +206,6 @@ void* SocketHandler(void* lp){
 		// Clear text contents and hendle request if not a text message
 		if (packet.type != 0){
 			runRequest(&packet);
-			memset(packet.text, 0, sizeof(packet.text));
 		}
 		
     if((bytecount = send(*csock, &packet, packet_length, 0))== -1){
