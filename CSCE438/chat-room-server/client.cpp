@@ -40,7 +40,7 @@ int deleteRoom(){
 }
 ///////////////////////////////////////////////////////////////////////////////
 int main(int argc, char* argv[]){
-	int server_port = 9005;
+	int server_port = 9007;
 	int rbufSize; // recieving buffer
 	int NETDB_MAX_HOST_NAME_LENGTH = 512;
 	char* server_name = (char*)"sun.cs.tamu.edu";

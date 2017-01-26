@@ -15,7 +15,7 @@
 #include <resolv.h>
 
 using namespace std;
-int lastUsablePort = 9005;
+int lastUsablePort = 9007;
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
@@ -68,6 +68,13 @@ ChatRoom getARoom(string roomName, std::vector<ChatRoom> rooms){
     }
     return db[roomIndex];
 }
+string getAllRoomNames(){
+	string names = "";
+	for (size_t i = 0; i < db.size(); i++) {
+		names += db[i].getName() + "\n";
+	}
+	return names;
+}
 // Server Functions ////////////////////////////////////////////////////////////
 struct Message{
 	// -1 = error
@@ -92,8 +99,8 @@ void  rCreate(string roomName, Message* packet){
 		ChatRoom c = getARoom(roomName, db);
 		packet->port = c.getPortNum();
 		packet->type = 2;
-		string s = " already exists";
-		string catted = roomName + s;
+		string s = "\nCurrent rooms:\n";
+		string catted = s + getAllRoomNames(); 
 		const char * msg = catted.c_str();
 		char buffer[1024];
 		memset(buffer,0,1024);
@@ -109,7 +116,7 @@ void  rCreate(string roomName, Message* packet){
 		}
 		memset(&roomaddr, 0, sizeof(roomaddr));
 		roomaddr.sin_family = AF_INET;
-		lastUsablePort + 1;
+		lastUsablePort += 1;
 		roomaddr.sin_port = lastUsablePort;
 		roomaddr.sin_addr.s_addr = INADDR_ANY;
 
@@ -119,7 +126,7 @@ void  rCreate(string roomName, Message* packet){
 			if (status<0) {
 				break;
 			}
-			lastUsablePort + 1;
+			lastUsablePort += 1;
 			roomaddr.sin_port = lastUsablePort;
 		}
 		port = lastUsablePort;
