@@ -16,16 +16,25 @@
 
 using namespace std;
 int lastUsablePort = 7005;
+struct Message;
+
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
   string roomName;
-
+	std::vector<Message> inbox;
+	pthread_mutex_t inboxLock;
 public:
 	ChatRoom(int roomSock, int pop, string name){
 		roomSocketPortNumber = roomSock;
 		population = pop;
 		roomName = name;
+
+		int status = -1;
+		status = pthread_mutex_init(&inboxLock, NULL);
+		if(status != 0){
+			printf("Error: Chatroom inbox couldn't be locked!\n%s\n",strerror(errno));
+		}
 	}
   // gets name of chat roomName
   string getName(){
