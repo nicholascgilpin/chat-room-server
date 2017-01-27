@@ -16,7 +16,18 @@
 
 using namespace std;
 int lastUsablePort = 7005;
-struct Message;
+
+struct Message{
+	// -1 = error
+	// 0 = text message
+	// 1 = delete
+	// 2 = join success
+	// 3 = create sucess
+	int type;
+	int port; // used to store port number in replies from server
+	int pop;
+	char text[1024]; // stores a message or command
+};
 
 class ChatRoom{
   int roomSocketPortNumber;
@@ -36,7 +47,23 @@ public:
 			printf("Error: Chatroom inbox couldn't be locked!\n%s\n",strerror(errno));
 		}
 	}
-  // gets name of chat roomName
+  // Adds a message to the inbox in a thread safe manner
+  void depositMsg(char* Msg){
+		int status = -1337;
+		status = pthread_mutex_lock(&inboxLock);
+		if(status != 0){
+			printf("Error: Mutex error %d!\n",status);
+		}
+		Message m;
+		m.type = 0;
+		m.port = 0;
+		m.pop = 0;
+		memcpy(&m,Msg,sizeof(m.text));
+		inbox.push_back(m);
+		pthread_mutex_unlock(&inboxLock);
+	}
+	
+	// gets name of chat roomName
   string getName(){
     return roomName;
   }
@@ -87,17 +114,6 @@ string getAllRoomNames(){
 	return names;
 }
 // Server Functions ////////////////////////////////////////////////////////////
-struct Message{
-	// -1 = error
-	// 0 = text message
-	// 1 = delete
-	// 2 = join success
-	// 3 = create sucess
-	int type;
-	int port; // used to store port number in replies from server
-	int pop;
-	char text[1024]; // stores a message or command
-};
 void printPacket(Message *m){
 	printf("type:%d\nport:%d\npopulation:%d\ntext:\n%s\n",m->type,m->port,m->pop,m->text);
 }
