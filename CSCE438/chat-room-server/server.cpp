@@ -37,7 +37,7 @@ class ChatRoom{
   int masterSD;
   string roomName;
 	std::vector<int> sockfds;
-	std::queue<Message> inbox;
+	std::queue<string> inbox;
 	pthread_mutex_t inboxLock;
 
 public:
@@ -56,31 +56,33 @@ public:
   // Adds a message to the inbox in a thread safe manner
   void depositMsg(char* Msg){
 		int status = -1337;
+		
 		status = pthread_mutex_lock(&inboxLock);
 		if(status != 0){
 			printf("Error: Mutex error %d!\n",status);
 		}
-		Message m;
-		m.type = 0;
-		m.port = 0;
-		m.pop = 0;
-		memcpy(&m,Msg,sizeof(m.text));
-		inbox.push(m);
+		
+		string letter(Msg);
+		inbox.push(letter);
+		
 		pthread_mutex_unlock(&inboxLock);
 	}
 	
 	// Removes a message from the inbox in a thread safe manner
 	string getMsg(){
 		int status = -1337;
+		
 		status = pthread_mutex_lock(&inboxLock);
 		if(status != 0){
 			printf("Error: Mutex error %d!\n",status);
 		}
-		Message m = inbox.front();
-		string strMsg(m.text);
+		
+		string m(inbox.front());
 		inbox.pop();
+		
 		pthread_mutex_unlock(&inboxLock);
-		return strMsg;
+		
+		return m;
 	}
 	
 	// gets name of chat roomName
@@ -210,13 +212,14 @@ void printPacket(Message *m){
 
 void runRequest(Message* packet);
 
+// Handles: all message recieving and routing. Sending for non-room messages
 void* SocketHandler(void* roomAndFD){
 	// Unbundle arguments
 	thread_args* passedRoomAndFD;
 	passedRoomAndFD = (thread_args*)roomAndFD;
 	ChatRoom* c = passedRoomAndFD->room;
 	int csock = passedRoomAndFD->sockfds; // roomfds modified by RoomHandler
-	
+
   int bytecount;
 	Message packet;
 	int packet_length = sizeof(Message);
@@ -237,30 +240,36 @@ void* SocketHandler(void* roomAndFD){
 		}
 		else{
 			printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
-			// Clear text contents and handle request if not a text message
-			if (packet.type == 0){
-				//@TODO: Deposit message
+			// Deposit message to room if in room. Print to server display otherwise
+			if (packet.type == 0 && passedRoomAndFD->clientIsInRoom == true){
+				c->depositMsg(packet.text);
+				// string asdf = c->getMsg();
+				// printf("Should be the deposited message:\n%s\n", asdf.c_str());
+			}
+			else if(packet.type == 0){
+				// Just let the message get echoed to teh server display
 			}
 			else{
+				// run request, record results in packet, and send back packeted results
 				runRequest(&packet);
 			}
-			printf("Packet immediatly before sending:\n");
-			printPacket(&packet);
-			
-			if((bytecount = send(csock, &packet, packet_length, 0))== -1){
-				fprintf(stderr, "Error sending data");
-				//free(csock);
-				return 0;
+			if (passedRoomAndFD->clientIsInRoom == false) {
+				printf("\nPacket immediatly before sending:\n");
+				printPacket(&packet);
+				if((bytecount = send(csock, &packet, packet_length, 0))== -1){
+					// fprintf(stderr, "Error sending data");
+					//free(csock);
+					return 0;
+				}
+				printf("Sent bytes %d\n", bytecount);
 			}
-			 
-			printf("Sent bytes %d\n", bytecount);
 		}
 }
   // free(csock);
   return 0;
 }
 
-// Room handler accepts new connections to a room 
+// Room handler accepts new connections to a room
 void* RoomHandler(void *roomAndFD){
 	// Unbundle arguments
 	thread_args* passedRoomAndFD;
@@ -278,12 +287,11 @@ void* RoomHandler(void *roomAndFD){
 
 	printf("\nRoom thread (not main server) waiting to accept join connection\n");
 	while(true){
-    	//ssock = (int*)malloc(sizeof(int));
 	    if((ssock = accept(roomMasterSD, (sockaddr*)&clientaddr, &addr_size))!= -1){
 	      c->storeSockfds(ssock);
 		  	c->printSockfds();
 		  	printf("\n---------------------\nReceived connection from %s\n",inet_ntoa(clientaddr.sin_addr));
-				
+				passedRoomAndFD->clientIsInRoom = true;
 				passedRoomAndFD->sockfds = ssock;
 	      pthread_create(&thread_id,0,&SocketHandler, (void*)passedRoomAndFD );
 	      pthread_detach(thread_id);
