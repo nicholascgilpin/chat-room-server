@@ -95,6 +95,8 @@ public:
 		return masterSD;
 	}
 	
+	//@TODO: This looks like it will overwrite the socket that is used to accept 
+	//	new clients to the room, thus preventing new clients from entering the room
 	int setMasterSD(int newSD){
 		masterSD = newSD;
 	}
@@ -135,7 +137,8 @@ public:
 struct thread_args {
     ChatRoom* room;
     int sockfds;
-		bool clientIsInRoom;
+		// true if thread is connected to a room socket, false otherwise
+		bool clientIsInRoom; 
 };
 
 
@@ -207,20 +210,24 @@ void printPacket(Message *m){
 
 void runRequest(Message* packet);
 
-void* SocketHandler(void* lp){
-  int *csock = (int*)lp;
-
+void* SocketHandler(void* roomAndFD){
+	// Unbundle arguments
+	thread_args* passedRoomAndFD;
+	passedRoomAndFD = (thread_args*)roomAndFD;
+	ChatRoom* c = passedRoomAndFD->room;
+	int csock = passedRoomAndFD->sockfds; // roomfds modified by RoomHandler
+	
   int bytecount;
 	Message packet;
 	int packet_length = sizeof(Message);
 
   while(1){
     
-    bytecount = recv(*csock, &packet, packet_length, 0);
+    bytecount = recv(csock, &packet, packet_length, 0);
 		if (bytecount<0) {
 			perror("Error: Server recv failed!\n");
-			free(csock);
-			return 0;
+			// free(csock);
+			// return 0;
 		}
 		else if (bytecount == 0){
 			//printf("Server's peer has disconneted or sent a 0 byte message!\n");
@@ -240,7 +247,7 @@ void* SocketHandler(void* lp){
 			printf("Packet immediatly before sending:\n");
 			printPacket(&packet);
 			
-			if((bytecount = send(*csock, &packet, packet_length, 0))== -1){
+			if((bytecount = send(csock, &packet, packet_length, 0))== -1){
 				fprintf(stderr, "Error sending data");
 				//free(csock);
 				return 0;
@@ -249,36 +256,36 @@ void* SocketHandler(void* lp){
 			printf("Sent bytes %d\n", bytecount);
 		}
 }
-  free(csock);
+  // free(csock);
   return 0;
 }
 
 // Room handler accepts new connections to a room 
 void* RoomHandler(void *roomAndFD){
-	//int roomMasterSD = *((int *)socketFD);
+	// Unbundle arguments
 	thread_args* passedRoomAndFD;
 	passedRoomAndFD = (thread_args*)roomAndFD;
 	ChatRoom* c = passedRoomAndFD->room;
 	int roomMasterSD = passedRoomAndFD->sockfds;
 	passedRoomAndFD->room->setMasterSD(roomMasterSD);
 	
-	printf("\nAAAAAAAAAAAAAAAAAAAAAAA RoomName and sd: %s, %d\n", c->getName().c_str(), roomMasterSD);
+	printf("\nAccepting connections for: RoomName %s / sd %d\n", c->getName().c_str(), roomMasterSD);
 	
-	
-	int* ssock; //Writing to this after accept will send message to client
+	int ssock = -1; //Writing to this after accept will send message to client
 	socklen_t addr_size = sizeof(sockaddr_in);
 	struct sockaddr_in clientaddr; // client address to be filled in by accept
-	sockaddr_in sadr;
 	pthread_t thread_id=0;
 
 	printf("\nRoom thread (not main server) waiting to accept join connection\n");
 	while(true){
-    	ssock = (int*)malloc(sizeof(int));
-	    if((*ssock = accept(roomMasterSD, (sockaddr*)&sadr, &addr_size))!= -1){
-	      c->storeSockfds(*ssock);
-		  c->printSockfds();
-		  printf("\n---------------------\nReceived connection from %s\n",inet_ntoa(sadr.sin_addr));
-	      pthread_create(&thread_id,0,&SocketHandler, (void*)ssock );
+    	//ssock = (int*)malloc(sizeof(int));
+	    if((ssock = accept(roomMasterSD, (sockaddr*)&clientaddr, &addr_size))!= -1){
+	      c->storeSockfds(ssock);
+		  	c->printSockfds();
+		  	printf("\n---------------------\nReceived connection from %s\n",inet_ntoa(clientaddr.sin_addr));
+				
+				passedRoomAndFD->sockfds = ssock;
+	      pthread_create(&thread_id,0,&SocketHandler, (void*)passedRoomAndFD );
 	      pthread_detach(thread_id);
 	    }
 		else{
@@ -360,7 +367,7 @@ void  rCreate(string roomName, Message* packet){
 		packet->port = port;
 		
 		// Create a thread to accept connections to this room's socket
-		
+		//	The thread args are later modified and forwareded to the data recieving thread
 		thread_args* passingRoomAndsd = new thread_args;
 		passingRoomAndsd->room = threadedRoom;
 		passingRoomAndsd->sockfds = roomSD;
@@ -516,10 +523,17 @@ int main(){
 // Stand ready to handle new clients or requests //////////////////////////////
    while(true){
     printf("waiting for a connection on port %d\n", server_port);
-    ssock = (int*)malloc(sizeof(int));
-    if((*ssock = accept(masterSD, (sockaddr*)&sadr, &addr_size))!= -1){
+		int sd = -1;
+		// Bundle args
+		thread_args* justSD = new thread_args;
+		justSD->room = NULL;
+		justSD->clientIsInRoom = false;
+		justSD->sockfds = sd;
+		
+		if((sd = accept(masterSD, (sockaddr*)&sadr, &addr_size))!= -1){
       printf("---------------------\nReceived connection from %s\n",inet_ntoa(sadr.sin_addr));
-      pthread_create(&thread_id,0,&SocketHandler, (void*)ssock );
+			justSD->sockfds = sd;
+      pthread_create(&thread_id,0,&SocketHandler, (void*)justSD );
       pthread_detach(thread_id);
     }
     else{
