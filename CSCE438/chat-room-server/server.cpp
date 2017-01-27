@@ -34,8 +34,10 @@ class ChatRoom{
   int roomSocketPortNumber;
   int population;
   string roomName;
+	std::vector<int> sockfds;
 	std::queue<Message> inbox;
 	pthread_mutex_t inboxLock;
+
 public:
 	ChatRoom(int roomSock, int pop, string name){
 		roomSocketPortNumber = roomSock;
@@ -48,6 +50,7 @@ public:
 			printf("Error: Chatroom inbox couldn't be locked!\n%s\n",strerror(errno));
 		}
 	}
+
   // Adds a message to the inbox in a thread safe manner
   void depositMsg(char* Msg){
 		int status = -1337;
@@ -87,11 +90,31 @@ public:
     return roomSocketPortNumber;
   }
 
-  // Gets the number of people in the chatroom labeld roomName
-  int getPopulation(){
-    return population;
-  }
+	// Gets the number of people in the chatroom labeld roomName
+	int getPopulation(){
+		return population;
+	}
+	  
+	void storeSockfds(int fd){
+		sockfds.push_back(fd);
+	}
+	
+	void printSockfds(){
+		for(size_t i = 0; i < sockfds.size(); i++){
+			printf("Sockfds[%d]: %d\n", i, sockfds[i]);
+		}
+	}
 };
+
+//Data structure to send through threads, because threads can't take multiple arguments
+//This allows us to pass filedescriptors to the threads of different rooms 
+//So different rooms have a list of clients.
+struct thread_args {
+    ChatRoom* room;
+    int sockfds;
+};
+
+
 // Database Functions //////////////////////////////////////////////////////////
 std::vector<ChatRoom> db;
 // Returns true if a room exists in the database
@@ -105,7 +128,6 @@ bool roomExists(string roomName){
     }
   return exists;
 }
-
 
 // Returns the room object for roomName. Doesn't check if room exists!
 ChatRoom getARoom(string roomName, std::vector<ChatRoom> rooms){
@@ -121,6 +143,21 @@ ChatRoom getARoom(string roomName, std::vector<ChatRoom> rooms){
     }
     return db[roomIndex];
 }
+
+ChatRoom* getARoomPointer(string roomName, std::vector<ChatRoom> &rooms){
+  int roomIndex = -1;
+    for (size_t i = 0; i < db.size(); i++) {
+      string nameX = db[i].getName();
+      if(roomName.compare(nameX) == 0){
+        roomIndex = i;
+      }
+    }
+    if (roomIndex == -1){
+      printf("Server couldn't find room!\n");
+    }
+    return &db[roomIndex];
+}
+
 string getAllRoomNames(){
 	string names = "";
 	for (size_t i = 0; i < db.size(); i++) {
@@ -179,8 +216,17 @@ void* SocketHandler(void* lp){
 }
 
 // Room handler manages operations for a room (accepting and message distibuting)
-void* RoomHandler(void* socketFD){
-	int roomMasterSD = *((int *)socketFD);
+//void* RoomHandler(void* socketFD){
+void* RoomHandler(void *roomAndFD){
+	//int roomMasterSD = *((int *)socketFD);
+	thread_args* passedRoomAndFD;
+	passedRoomAndFD = (thread_args*)roomAndFD;
+	ChatRoom* c = passedRoomAndFD->room;
+	int roomMasterSD = passedRoomAndFD->sockfds;
+	
+	printf("\nAAAAAAAAAAAAAAAAAAAAAAA RoomName and sd: %s, %d\n", c->getName().c_str(), roomMasterSD);
+	
+	
 	int* ssock; //Writing to this after accept will send message to client
 	socklen_t addr_size = sizeof(sockaddr_in);
 	struct sockaddr_in clientaddr; // client address to be filled in by accept
@@ -188,10 +234,12 @@ void* RoomHandler(void* socketFD){
 	pthread_t thread_id=0;
 
 	while(true){
-		printf("Room thread (not main server) waiting to accept join connection\n");
+		printf("\nRoom thread (not main server) waiting to accept join connection\n");
     	ssock = (int*)malloc(sizeof(int));
 	    if((*ssock = accept(roomMasterSD, (sockaddr*)&sadr, &addr_size))!= -1){
-	      printf("---------------------\nReceived connection from %s\n",inet_ntoa(sadr.sin_addr));
+	      c->storeSockfds(*ssock);
+		  c->printSockfds();
+		  printf("\n---------------------\nReceived connection from %s\n",inet_ntoa(sadr.sin_addr));
 	      pthread_create(&thread_id,0,&SocketHandler, (void*)ssock );
 	      pthread_detach(thread_id);
 	    }
@@ -259,6 +307,7 @@ void  rCreate(string roomName, Message* packet){
 		db.push_back(d);
 		printf("In db:\n");
 		ChatRoom r = getARoom(roomName,db);
+		ChatRoom *threadedRoom = getARoomPointer(roomName, db);
 		printf("%d\n",r.getPortNum() );
 		printf("%d\n",r.getPopulation() );
 		printf("%s\n",r.getName().c_str());
@@ -272,9 +321,12 @@ void  rCreate(string roomName, Message* packet){
 		packet->port = port;
 		
 		// Create a thread to accept connections to this room's socket
-		int* threadPassableSD = (int*)malloc(sizeof(int));
-		*threadPassableSD = roomSD;
-		pthread_create(&thread_id,0,&RoomHandler, (void*)threadPassableSD );
+		
+		thread_args* passingRoomAndsd = new thread_args;
+		passingRoomAndsd->room = threadedRoom;
+		passingRoomAndsd->sockfds = roomSD;
+		
+		pthread_create(&thread_id,0,&RoomHandler, (void*)passingRoomAndsd);
 		pthread_detach(thread_id);
 	}
 }
@@ -286,7 +338,7 @@ void rJoin(string roomName, Message* packet){
 		ChatRoom temp = getARoom(roomName, db);
 		packet->port = temp.getPortNum();
 		packet->type = 2;
-		packet->pop = 1 + temp.getPopulation();
+		packet->pop = temp.getPopulation();
   }
   else{
 		printf("Client cannot join %s because room doesn't exist.\n",roomName.c_str());
@@ -297,10 +349,39 @@ void rJoin(string roomName, Message* packet){
 // Description: Return -1 for error
 void rDelete(string roomName, Message* packet){
 	if(roomExists(roomName)){
+		int sd=-1;
+		printf("Deleting Room %s\n",roomName.c_str());
+		ChatRoom temp = getARoom(roomName, db);
+		packet->port = temp.getPortNum();
+		packet->type = 2;
+		packet->pop = temp.getPopulation();
+		int roomIndex; 
+		
+		for (size_t i = 0; i < db.size(); i++) {
+		  string nameX = db[i].getName();
+		  if(roomName.compare(nameX) == 0){
+			roomIndex = i;
+		  }
+		}
+		db.erase(db.begin() + roomIndex);
+		
+		sd = socket(AF_INET, SOCK_STREAM, 0);
+		if (sd < 0) {
+			perror("Error: Server couldn't create master socket!\n");
+		}
 
+		// Figure out our address
+		/*
+		memset(&serveraddr, 0, sizeof(serveraddr));
+		serveraddr.sin_family = AF_INET; // Use ip addresses with 4 dots
+		// The port tells packets which program to go to after entering the copmuter
+		serveraddr.sin_port = htons(packet->port); 
+		// INADDR_ANY means read to any incoming connections on this computer
+		serveraddr.sin_addr.s_addr = INADDR_ANY;*/
   }
   else{
-    // @TODO: Create room and send info to client
+		printf("Client cannot delete %s because room doesn't exist.\n",roomName.c_str());
+		packet->type = -1;
   }
 }
 
@@ -322,6 +403,7 @@ void runRequest(Message* packet){
 	else if (type == 'd'){
 		printf("Handling delete for room %s\n",roomName);
 		memset(packet, 0, sizeof(Message));
+		rDelete(roomName, packet);
 	}
 	else{
 		printf("Error: unrecognized client command %s!\n", type);
