@@ -9,16 +9,18 @@
 #include <string.h> //memset
 #include <string> // c++ strings
 #include <vector>
+#include <algorithm>
 #include <unistd.h> //close
 #include <stdio.h>  //printf
 #include <pthread.h>
 #include <resolv.h>
 
 using namespace std;
-int lastUsablePort = 9105;
+int lastUsablePort = 9056;
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
+  int masterSD;
   string roomName;
   std::vector<int> sockfds;
 
@@ -36,6 +38,14 @@ public:
 	int getPortNum(){
 		return roomSocketPortNumber;
 	}
+	
+	int getMasterSD(){
+		return masterSD;
+	}
+	
+	int setMasterSD(int newSD){
+		masterSD = newSD;
+	}
 
 	// Gets the number of people in the chatroom labeld roomName
 	int getPopulation(){
@@ -47,8 +57,21 @@ public:
 	}
 	
 	void printSockfds(){
+		if(sockfds.empty()){
+			printf("\nSocket list: Empty\n");
+		}
+		else{
+			for(size_t i = 0; i < sockfds.size(); i++){
+				printf("Sockfds[%d]: %d\n", i, sockfds[i]);
+			}
+		}
+	}
+	void clearSockfds(){
 		for(size_t i = 0; i < sockfds.size(); i++){
-			printf("Sockfds[%d]: %d\n", i, sockfds[i]);
+			close(sockfds[i]);
+		}
+		while (!sockfds.empty()){
+			sockfds.pop_back();
 		}
 	}
 };
@@ -74,6 +97,17 @@ bool roomExists(string roomName){
       }
     }
   return exists;
+}
+
+void deleteRoom(string roomName){
+	int roomIndex = -1;
+    for (size_t i = 0; i < db.size(); i++) {
+      string nameX = db[i].getName();
+      if(roomName.compare(nameX) == 0){
+        roomIndex = i;
+      }
+    }
+	db.erase(db.begin()+roomIndex);
 }
 
 // Returns the room object for roomName. Doesn't check if room exists!
@@ -163,7 +197,7 @@ void* SocketHandler(void* lp){
 			
 			if((bytecount = send(*csock, &packet, packet_length, 0))== -1){
 				fprintf(stderr, "Error sending data");
-				free(csock);
+				//free(csock);
 				return 0;
 			}
 			 
@@ -182,6 +216,7 @@ void* RoomHandler(void *roomAndFD){
 	passedRoomAndFD = (thread_args*)roomAndFD;
 	ChatRoom* c = passedRoomAndFD->room;
 	int roomMasterSD = passedRoomAndFD->sockfds;
+	passedRoomAndFD->room->setMasterSD(roomMasterSD);
 	
 	printf("\nAAAAAAAAAAAAAAAAAAAAAAA RoomName and sd: %s, %d\n", c->getName().c_str(), roomMasterSD);
 	
@@ -271,6 +306,7 @@ void  rCreate(string roomName, Message* packet){
 		printf("%d\n",r.getPopulation() );
 		printf("%s\n",r.getName().c_str());
 		// Critical Section!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+		
 		if (roomExists(roomName)){
 			printf("Create room %s success!\n", roomName.c_str());
 			status = 3;
@@ -309,8 +345,23 @@ void rJoin(string roomName, Message* packet){
 void rDelete(string roomName, Message* packet){
 	if(roomExists(roomName)){
 		int sd=-1;
-		printf("Deleting Room %s\n",roomName.c_str());
 		ChatRoom temp = getARoom(roomName, db);
+		packet->port = temp.getPortNum();
+		packet->type = 1;
+		packet->pop = temp.getPopulation();
+		printf("Deleting Room %s\n",roomName.c_str());
+		//ChatRoom temp = getARoom(roomName, db);
+		ChatRoom *c = getARoomPointer(roomName, db);
+		c->printSockfds();
+		c->clearSockfds();
+		c->printSockfds();
+		
+		printf("TESTING TESTING: %d", c->getMasterSD());
+		close(c->getMasterSD());
+		deleteRoom(roomName);
+		
+
+		/*
 		packet->port = temp.getPortNum();
 		packet->type = 2;
 		packet->pop = temp.getPopulation();
@@ -327,7 +378,7 @@ void rDelete(string roomName, Message* packet){
 		sd = socket(AF_INET, SOCK_STREAM, 0);
 		if (sd < 0) {
 			perror("Error: Server couldn't create master socket!\n");
-		}
+		}*/
 
 		// Figure out our address
 		/*
