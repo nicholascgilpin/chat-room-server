@@ -9,6 +9,7 @@
 #include <string.h> //memset
 #include <string> // c++ strings
 #include <vector>
+#include <queue>
 #include <unistd.h> //close
 #include <stdio.h>  //printf
 #include <pthread.h>
@@ -33,7 +34,7 @@ class ChatRoom{
   int roomSocketPortNumber;
   int population;
   string roomName;
-	std::vector<Message> inbox;
+	std::queue<Message> inbox;
 	pthread_mutex_t inboxLock;
 public:
 	ChatRoom(int roomSock, int pop, string name){
@@ -59,7 +60,7 @@ public:
 		m.port = 0;
 		m.pop = 0;
 		memcpy(&m,Msg,sizeof(m.text));
-		inbox.push_back(m);
+		inbox.push(m);
 		pthread_mutex_unlock(&inboxLock);
 	}
 	
