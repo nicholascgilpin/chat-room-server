@@ -10,7 +10,7 @@
 
 using namespace std;
 // Constants //////////////////////////////////////////////////////////////////
-const int master_port = 9105;
+const int master_port = 9056;
 // Client Functions ////////////////////////////////////////////////////////////
 struct Message{
 	// -1 = error
@@ -154,7 +154,7 @@ int joinRoom(Message *packet){
 //////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char* argv[]){
-	int server_port = 9105;
+	int server_port = 9056;
 	int rbufSize; // recieving buffer
 	int NETDB_MAX_HOST_NAME_LENGTH = 512;
 	char* server_name = (char*)"sun.cs.tamu.edu";
@@ -257,9 +257,8 @@ int main(int argc, char* argv[]){
 				 printf("Request succeeded!\n");
 				 switch(packet.type){
 					 case 1:
-						close(sd);
 						deleteRoom(&packet);
-						printf("DELETE SUCCESS. You have been removed from the room.");
+						printf("DELETE SUCCESS. You have removed the room.");
 						break;
 					 case 2:
 						printf("Client: Leaving Master Server! Joining room at: %d\n", packet.port);
