@@ -64,6 +64,20 @@ public:
 		pthread_mutex_unlock(&inboxLock);
 	}
 	
+	// Removes a message from the inbox in a thread safe manner
+	string getMsg(){
+		int status = -1337;
+		status = pthread_mutex_lock(&inboxLock);
+		if(status != 0){
+			printf("Error: Mutex error %d!\n",status);
+		}
+		Message m = inbox.front();
+		string strMsg(m.text);
+		inbox.pop();
+		pthread_mutex_unlock(&inboxLock);
+		return strMsg;
+	}
+	
 	// gets name of chat roomName
   string getName(){
     return roomName;
