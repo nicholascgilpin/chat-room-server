@@ -101,9 +101,10 @@ public:
 
 	// Gets the number of people in the chatroom labeld roomName
 	int getPopulation(){
-		return population;
+		return sockfds.size();
 	}
-	  
+	
+	// Adds client socket descriptor to the room list  
 	void storeSockfds(int fd){
 		sockfds.push_back(fd);
 	}
@@ -134,6 +135,7 @@ public:
 struct thread_args {
     ChatRoom* room;
     int sockfds;
+		bool clientIsInRoom;
 };
 
 
@@ -229,7 +231,10 @@ void* SocketHandler(void* lp){
 		else{
 			printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
 			// Clear text contents and handle request if not a text message
-			if (packet.type != 0){
+			if (packet.type == 0){
+				//@TODO: Deposit message
+			}
+			else{
 				runRequest(&packet);
 			}
 			printf("Packet immediatly before sending:\n");
@@ -248,8 +253,7 @@ void* SocketHandler(void* lp){
   return 0;
 }
 
-// Room handler manages operations for a room (accepting and message distibuting)
-//void* RoomHandler(void* socketFD){
+// Room handler accepts new connections to a room 
 void* RoomHandler(void *roomAndFD){
 	//int roomMasterSD = *((int *)socketFD);
 	thread_args* passedRoomAndFD;
@@ -267,8 +271,8 @@ void* RoomHandler(void *roomAndFD){
 	sockaddr_in sadr;
 	pthread_t thread_id=0;
 
+	printf("\nRoom thread (not main server) waiting to accept join connection\n");
 	while(true){
-		printf("\nRoom thread (not main server) waiting to accept join connection\n");
     	ssock = (int*)malloc(sizeof(int));
 	    if((*ssock = accept(roomMasterSD, (sockaddr*)&sadr, &addr_size))!= -1){
 	      c->storeSockfds(*ssock);
