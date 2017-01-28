@@ -30,17 +30,25 @@ struct Message{
 	int pop;
 	char text[1024]; // stores a message or command
 };
-
+// Clears and marshalls a Message packet for sending accross the network
+void msgBuilder(Message* m,string text, int type = 0, int port = -1, int pop = -1){
+	memset(m->text,0,sizeof(Message));
+	m->type = type;
+	m->port = port;
+	m->pop = pop;
+	strncpy(m->text, text.c_str(), sizeof(Message));
+	m->text[sizeof(Message)-1] = 0; //NULL terminate the c string
+}
 class ChatRoom{
   int roomSocketPortNumber;
   int population;
   int masterSD;
   string roomName;
-	std::vector<int> sockfds;
 	std::queue<string> inbox;
 	pthread_mutex_t inboxLock;
 
 public:
+	std::vector<int> sockfds;
 	ChatRoom(int roomSock, int pop, string name){
 		roomSocketPortNumber = roomSock;
 		population = pop;
@@ -83,6 +91,10 @@ public:
 		pthread_mutex_unlock(&inboxLock);
 		
 		return m;
+	}
+	
+	int inboxSize(){
+		return inbox.size();
 	}
 	
 	// gets name of chat roomName
@@ -239,7 +251,7 @@ void* SocketHandler(void* roomAndFD){
 			perror("Error: Server recieved a message too large to process!\n");
 		}
 		else{
-			printf("Received bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
+			printf("\nReceived bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
 			// Deposit message to room if in room. Print to server display otherwise
 			if (packet.type == 0 && passedRoomAndFD->clientIsInRoom == true){
 				c->depositMsg(packet.text);
@@ -261,7 +273,7 @@ void* SocketHandler(void* roomAndFD){
 					//free(csock);
 					return 0;
 				}
-				printf("Sent bytes %d\n", bytecount);
+				printf("Sent bytes from non-bulk %d\n", bytecount);
 			}
 		}
 }
@@ -283,7 +295,7 @@ void* RoomHandler(void *roomAndFD){
 	int ssock = -1; //Writing to this after accept will send message to client
 	socklen_t addr_size = sizeof(sockaddr_in);
 	struct sockaddr_in clientaddr; // client address to be filled in by accept
-	pthread_t thread_id=0;
+	pthread_t thread_id=-1;
 
 	printf("\nRoom thread (not main server) waiting to accept join connection\n");
 	while(true){
@@ -302,12 +314,51 @@ void* RoomHandler(void *roomAndFD){
 		}
 	}
 }
+
+// Handles: Bulk sending for room messages
+void* MessageHandler(void* roomAndFD){
+	// Unbundle arguments
+	thread_args* passedRoomAndFD;
+	passedRoomAndFD = (thread_args*)roomAndFD;
+	ChatRoom* c = passedRoomAndFD->room;
+
+  int bytecount;
+	Message packet;
+	int packet_length = sizeof(Message);
+	int inboxSZ = 0;
+  while(true){
+		inboxSZ = c->inboxSize();
+		if (inboxSZ > 0) {
+			int population = c->getPopulation();
+			string message(c->getMsg());
+			msgBuilder(&packet,message);
+			printf("\nPacket immediatly before bulk send:\n");
+			printf("Number of places to send: %d\n",population);
+			printPacket(&packet);
+			bytecount = -1;
+			for (size_t i = 0; i < population; i++) {
+				printf("sending to index: %d/%d\n", i, population-1);
+				bytecount += send(c->sockfds[i], &packet, packet_length, 0);
+				if(bytecount == -1){
+					perror("Error: Couldn't send message!\n");
+					return 0;
+				}
+				printf("%d\n",1 );
+			}
+			printf("%d\n",2 );
+			printf("Bulk sent bytes %d\n", bytecount);
+		} // Segfault occurs here
+		printf("%d\n",3 );
+	}
+	printf("%d\n",4 );
+}
+
 // Creates a room if none exist, then sends the port number to the client
 // @TODO: Make robust by adding mutex lock on db operations and checking port use
 void  rCreate(string roomName, Message* packet){
 	int roomSD = -1, status = -1, port = -1, population = 0;
 	struct sockaddr_in roomaddr;
-	pthread_t thread_id=0;
+	pthread_t acceptorThread=-1,messageThread=-1;
 	
 	if(roomExists(roomName)){
 		printf("Room %s found!\n", roomName.c_str());
@@ -361,9 +412,9 @@ void  rCreate(string roomName, Message* packet){
 		printf("In db:\n");
 		ChatRoom r = getARoom(roomName,db);
 		ChatRoom *threadedRoom = getARoomPointer(roomName, db);
-		printf("%d\n",r.getPortNum() );
-		printf("%d\n",r.getPopulation() );
-		printf("%s\n",r.getName().c_str());
+		printf("port %d\n",r.getPortNum() );
+		printf("pop  %d\n",r.getPopulation() );
+		printf("name %s\n",r.getName().c_str());
 		// Critical Section!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 		
 		if (roomExists(roomName)){
@@ -375,13 +426,18 @@ void  rCreate(string roomName, Message* packet){
 		packet->port = port;
 		
 		// Create a thread to accept connections to this room's socket
-		//	The thread args are later modified and forwareded to the data recieving thread
+		//	RoomHandler modifies the threadArgs and forwareds them to SocketHandler
 		thread_args* passingRoomAndsd = new thread_args;
 		passingRoomAndsd->room = threadedRoom;
 		passingRoomAndsd->sockfds = roomSD;
+		pthread_create(&acceptorThread,0,&RoomHandler, (void*)passingRoomAndsd);
+		pthread_detach(acceptorThread);
 		
-		pthread_create(&thread_id,0,&RoomHandler, (void*)passingRoomAndsd);
-		pthread_detach(thread_id);
+		thread_args* roomInfo = new thread_args;
+		roomInfo->room = threadedRoom;
+		roomInfo->sockfds = roomSD;
+		pthread_create(&messageThread,0,&MessageHandler,(void*)roomInfo);
+		pthread_detach(messageThread);
 	}
 }
 
