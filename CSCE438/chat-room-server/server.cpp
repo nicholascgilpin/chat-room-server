@@ -373,6 +373,7 @@ void* MessageHandler(void* roomAndFD){
 			}
 		}
 	}
+	printf("%d\n",4 );
 }
 
 // Creates a room if none exist, then sends the port number to the client
