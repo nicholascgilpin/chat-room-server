@@ -248,6 +248,7 @@ void* SocketHandler(void* roomAndFD){
     bytecount = recv(csock, &packet, packet_length, 0);
 		if (bytecount<0) {
 			perror("Error: Server recv failed!\n");
+			break;
 			// free(csock);
 			// return 0;
 		}
