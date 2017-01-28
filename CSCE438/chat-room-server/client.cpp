@@ -154,7 +154,7 @@ int joinRoom(Message *packet){
 //////////////////////////////////////////////////////////////////////////////
 
 int main(int argc, char* argv[]){
-	int server_port = 9056;
+	int server_port = 7005;
 	int rbufSize; // recieving buffer
 	int NETDB_MAX_HOST_NAME_LENGTH = 512;
 	char* server_name = (char*)"sun.cs.tamu.edu";
@@ -252,6 +252,9 @@ int main(int argc, char* argv[]){
 			 }
 			 if(packet.type == -1){
 				 printf("Request failed!\n");
+			 }
+			 else if (packet.type == 0) {
+			 	printf("Response: %s\n",packet.text);
 			 }
 			 else if ((packet.type == 1) || packet.type == 2 || packet.type == 3){
 				 printf("Request succeeded!\n");
