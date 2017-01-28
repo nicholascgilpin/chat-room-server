@@ -199,7 +199,7 @@ int joinRoom(Message *packet){
 //////////////////////////////////////////////////////////////////////////////
 // The main thread handles user input and sending messages to the server
 int main(int argc, char* argv[]){
-	int server_port = 7005;
+	int server_port = 7009;
 	int rbufSize; // recieving buffer
 	int NETDB_MAX_HOST_NAME_LENGTH = 512;
 	char* server_name = (char*)"sun.cs.tamu.edu";
@@ -249,7 +249,7 @@ int main(int argc, char* argv[]){
 	// Request a connection to the server
     rc = connect(sd, (struct sockaddr *)&serveraddr, sizeof(serveraddr));
     if (rc<0) {
-      perror("Error: Client couldn't connect!");
+      printf("Error: Client couldn't connect on port %d!", server_port);
       exit(1);
     }
     else{
@@ -310,9 +310,6 @@ int main(int argc, char* argv[]){
 						break;
 					 case 2:
 						printf("Client: Leaving Master Server! Joining room at: %d\n", packet.port);
-						// Let's use the main thread to take input and send
-						// Then use another thread to recieve and display from server
-						// close(sd);
 						joinRoom(&packet);
 						break;
 					 case 3:

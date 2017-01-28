@@ -17,7 +17,7 @@
 #include <resolv.h>
 
 using namespace std;
-int lastUsablePort = 7005;
+int lastUsablePort = 7009;
 
 struct Message{
 	// -1 = error
@@ -130,6 +130,7 @@ public:
 			printf("\nSocket list: Empty\n");
 		}
 		else{
+			printf("\nCurrent room members:\n");
 			for(size_t i = 0; i < sockfds.size(); i++){
 				printf("Sockfds[%d]: %d\n", i, sockfds[i]);
 			}
@@ -251,12 +252,11 @@ void* SocketHandler(void* roomAndFD){
 			perror("Error: Server recieved a message too large to process!\n");
 		}
 		else{
-			printf("\nReceived bytes %d\nReceived string \"%s\"\n", bytecount, (Message*) packet.text);
+			printf("\nReceived bytes %d\nInput Handler received string \"%s\"\n", bytecount, (Message*) packet.text);
 			// Deposit message to room if in room. Print to server display otherwise
 			if (packet.type == 0 && passedRoomAndFD->clientIsInRoom == true){
+				printf("Message sent to a room inbox\n");
 				c->depositMsg(packet.text);
-				// string asdf = c->getMsg();
-				// printf("Should be the deposited message:\n%s\n", asdf.c_str());
 			}
 			else if(packet.type == 0){
 				// Just let the message get echoed to teh server display
@@ -273,7 +273,7 @@ void* SocketHandler(void* roomAndFD){
 					//free(csock);
 					return 0;
 				}
-				printf("Sent bytes from non-bulk %d\n", bytecount);
+				printf("Sent bytes from non-bulk sending thread %d\n", bytecount);
 			}
 		}
 }
@@ -302,7 +302,7 @@ void* RoomHandler(void *roomAndFD){
 	    if((ssock = accept(roomMasterSD, (sockaddr*)&clientaddr, &addr_size))!= -1){
 	      c->storeSockfds(ssock);
 		  	c->printSockfds();
-		  	printf("\n---------------------\nReceived connection from %s\n",inet_ntoa(clientaddr.sin_addr));
+		  	printf("\nRoom received connection from %s\n",inet_ntoa(clientaddr.sin_addr));
 				passedRoomAndFD->clientIsInRoom = true;
 				passedRoomAndFD->sockfds = ssock;
 	      pthread_create(&thread_id,0,&SocketHandler, (void*)passedRoomAndFD );
@@ -342,20 +342,19 @@ void* MessageHandler(void* roomAndFD){
 			strncpy(buffer,msg,1024 -1);
 			memcpy(packet.text,buffer,1024);
 			
-			printf("\nPacket immediatly before bulk send:\n");
-			printf("Number of places to send: %d\n",population);
-			printPacket(&packet);
 			bytecount = -1;
 			for (size_t i = 0; i < population; i++) {
+				printf("\nPacket immediatly before bulk send:\n");
 				printf("sending to index: %d/%d\n", i, population-1);
-				bytecount += send(c->sockfds[i], &packet, packet_length, 0);
+				printPacket(&packet);
+				bytecount == send(c->sockfds[i], &packet, packet_length, 0);
 				if(bytecount == -1){
 					perror("Error: Couldn't send message!\n");
 					return 0;
 				}
+				printf("client sent bytes: %d\n", bytecount);
 			}
-			printf("Bulk sent bytes %d\n", bytecount);
-		} // Segfault occurs here
+		}
 	}
 }
 
@@ -591,9 +590,9 @@ int main(){
 
     socklen_t addr_size = sizeof(sockaddr_in);
 // Stand ready to handle new clients or requests //////////////////////////////
+	int sd = -1;
    while(true){
-    printf("waiting for a connection on port %d\n", server_port);
-		int sd = -1;
+    printf("Server master socket waiting for a connection on port %d\n", server_port);
 		// Bundle args
 		thread_args* justSD = new thread_args;
 		justSD->room = NULL;
@@ -601,7 +600,7 @@ int main(){
 		justSD->sockfds = sd;
 		
 		if((sd = accept(masterSD, (sockaddr*)&sadr, &addr_size))!= -1){
-      printf("---------------------\nReceived connection from %s\n",inet_ntoa(sadr.sin_addr));
+      printf("Master socket received connection from %s\n",inet_ntoa(sadr.sin_addr));
 			justSD->sockfds = sd;
       pthread_create(&thread_id,0,&SocketHandler, (void*)justSD );
       pthread_detach(thread_id);
@@ -610,57 +609,4 @@ int main(){
       fprintf(stderr, "Error accepting");
     }
   }
-
-
-
-/*
-    printf("Server: Ready for client connect().\n");
-		for(;;){
-			// accept() Extracts the first connection
-			//  request on the queue of pending connections for the listening socket,
-			//  sockfd, creates a new connected socket, and returns a new file
-			//  descriptor referring to that socket.  The newly created socket is not
-			//  in the listening state.  The original socket sockfd is unaffected by
-			//  this call.
-			incomingSD = accept(masterSD, NULL, NULL);
-			if (incomingSD<0) {
-				perror("Error: Server couldn't accept a master socket connection!");
-			}
-			
-			printf("Server: Client connected!\n");
-			
-			// Reset the address size for different clients
-			clientAddrLen = sizeof(clientaddr);
-			
-			// Wait for a message to arrive, copy the message to buffer, copy address to clientaddr
-			recvMsgSize = recvfrom(incomingSD, buffer, sizeof(buffer),0, (struct sockaddr*)&clientaddr, &clientAddrLen);
-			if (recvMsgSize<0) {
-				perror("Error: Server recv failed!");
-			}
-			else if (recvMsgSize == 0){
-				printf("Server's peer has disconneted or sent a 0 byte message!");
-			}
-			else if (recvMsgSize > sizeof(buffer)) {
-				perror("Error: Server recieved a message too large to process!");
-			}
-			
-			printf("Server: handling client: %s\n", inet_ntoa(clientaddr.sin_addr));
-			
-			// Send buffer to the client on socket with id incomingSD
-			rc = send(incomingSD, buffer, sizeof(buffer), 0);
-			// rc is the number of bytes sent
-			if (rc<0) {
-				perror("Error: Server couldn't send message!");
-			}
-
-		}
-// Clean up code///////////////////////////////////////////////////////////////
-	printf("Server: Shutting down!\n");
-
-  if(masterSD!=-1){
-    close(masterSD);
-  }
-  if(incomingSD!=-1){
-    close(incomingSD);
-  } */
 }
