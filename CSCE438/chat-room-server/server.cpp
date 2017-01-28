@@ -17,7 +17,7 @@
 #include <resolv.h>
 
 using namespace std;
-int lastUsablePort = 7009;
+int lastUsablePort = 6546;
 
 struct Message{
 	// -1 = error
@@ -232,12 +232,18 @@ void* SocketHandler(void* roomAndFD){
 	passedRoomAndFD = (thread_args*)roomAndFD;
 	ChatRoom* c = passedRoomAndFD->room;
 	int csock = passedRoomAndFD->sockfds; // roomfds modified by RoomHandler
-
+	
   int bytecount;
 	Message packet;
 	int packet_length = sizeof(Message);
-
-  while(1){
+	
+	if(passedRoomAndFD->clientIsInRoom == true){
+		printf("A new input thread has been activated\n");
+	}
+	
+	bool needed = true;
+	
+  while(needed){
     
     bytecount = recv(csock, &packet, packet_length, 0);
 		if (bytecount<0) {
@@ -254,6 +260,8 @@ void* SocketHandler(void* roomAndFD){
 		else{
 			printf("\nReceived bytes %d\nInput Handler received string \"%s\"\n", bytecount, (Message*) packet.text);
 			// Deposit message to room if in room. Print to server display otherwise
+			printf("recieved packet type: %d\n",packet.type );
+			printf("Thread connected to room = %d\n",passedRoomAndFD->clientIsInRoom );
 			if (packet.type == 0 && passedRoomAndFD->clientIsInRoom == true){
 				printf("Message sent to a room inbox\n");
 				c->depositMsg(packet.text);
@@ -262,6 +270,14 @@ void* SocketHandler(void* roomAndFD){
 				// Just let the message get echoed to teh server display
 			}
 			else{
+				// @TODO: remove this last minute hack below
+				char command[6], roomName[80];
+				sscanf(packet.text, "%s %s", command, roomName);
+				char type = command[1];
+				if (type == 'j') {
+					needed = false; // end this thread if a join request arrives
+				}
+				
 				// run request, record results in packet, and send back packeted results
 				runRequest(&packet);
 			}
@@ -277,7 +293,7 @@ void* SocketHandler(void* roomAndFD){
 			}
 		}
 }
-  // free(csock);
+  printf("Closing client's original connection.\n");
   return 0;
 }
 
@@ -479,35 +495,6 @@ void rDelete(string roomName, Message* packet){
 		printf("TESTING TESTING: %d", c->getMasterSD());
 		close(c->getMasterSD());
 		deleteRoom(roomName);
-		
-
-		/*
-		packet->port = temp.getPortNum();
-		packet->type = 2;
-		packet->pop = temp.getPopulation();
-		int roomIndex; 
-		
-		for (size_t i = 0; i < db.size(); i++) {
-		  string nameX = db[i].getName();
-		  if(roomName.compare(nameX) == 0){
-			roomIndex = i;
-		  }
-		}
-		db.erase(db.begin() + roomIndex);
-		
-		sd = socket(AF_INET, SOCK_STREAM, 0);
-		if (sd < 0) {
-			perror("Error: Server couldn't create master socket!\n");
-		}*/
-
-		// Figure out our address
-		/*
-		memset(&serveraddr, 0, sizeof(serveraddr));
-		serveraddr.sin_family = AF_INET; // Use ip addresses with 4 dots
-		// The port tells packets which program to go to after entering the copmuter
-		serveraddr.sin_port = htons(packet->port); 
-		// INADDR_ANY means read to any incoming connections on this computer
-		serveraddr.sin_addr.s_addr = INADDR_ANY;*/
   }
   else{
 		printf("Client cannot delete %s because room doesn't exist.\n",roomName.c_str());
@@ -554,7 +541,6 @@ int main(){
 	sockaddr_in sadr;
 	struct timeval timeout;
 	struct sockaddr_in serveraddr; // local address
-	// struct sockaddr_in clientaddr; // client address
 	uint clientAddrLen; // length of incoming message
 	int recvMsgSize; //size of recieved message
 	pthread_t thread_id=0;
