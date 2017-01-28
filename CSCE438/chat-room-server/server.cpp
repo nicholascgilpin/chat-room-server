@@ -331,7 +331,17 @@ void* MessageHandler(void* roomAndFD){
 		if (inboxSZ > 0) {
 			int population = c->getPopulation();
 			string message(c->getMsg());
-			msgBuilder(&packet,message);
+			
+			memset(&packet,0,sizeof(Message));
+			packet.type = 0;
+			packet.port = -1;
+			packet.pop = -1;
+			const char* msg = message.c_str();
+			char buffer[1024];
+			memset(buffer,0,1024);
+			strncpy(buffer,msg,1024 -1);
+			memcpy(packet.text,buffer,1024);
+			
 			printf("\nPacket immediatly before bulk send:\n");
 			printf("Number of places to send: %d\n",population);
 			printPacket(&packet);
@@ -343,14 +353,10 @@ void* MessageHandler(void* roomAndFD){
 					perror("Error: Couldn't send message!\n");
 					return 0;
 				}
-				printf("%d\n",1 );
 			}
-			printf("%d\n",2 );
 			printf("Bulk sent bytes %d\n", bytecount);
 		} // Segfault occurs here
-		printf("%d\n",3 );
 	}
-	printf("%d\n",4 );
 }
 
 // Creates a room if none exist, then sends the port number to the client
