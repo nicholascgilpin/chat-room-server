@@ -24,6 +24,43 @@ struct Message{
 	char text[1024]; // stores a message or command
 };
 
+struct thread_args {
+    int sockfds;
+		// true if thread is connected to a room socket, false otherwise
+		bool clientIsInRoom; 
+};
+
+// Recieve room messages and display without blocking other stuff
+void* SocketHandler(void* roomAndFD){
+	// Unbundle arguments
+	thread_args* passedRoomAndFD;
+	passedRoomAndFD = (thread_args*)roomAndFD;
+	int csock = passedRoomAndFD->sockfds; // roomfds modified by RoomHandler
+
+  int bytecount;
+	Message packet;
+	int packet_length = sizeof(Message);
+
+  while(1){
+		memset(&packet, 0, sizeof(Message));
+    bytecount = recv(csock, &packet, packet_length, 0);
+		if (bytecount < 0) {
+			perror("Error: Client recv failed!\n");
+		}
+		else if (bytecount == 0){
+			//printf("Client's peer has disconneted or sent a 0 byte message!\n");
+		}
+		else if (bytecount > sizeof(Message)) {
+			perror("Error: Client recieved a message too large to process!\n");
+		}
+		else{
+			printf("Response:\n%s\n", packet.text);
+		}
+}
+  // free(csock);
+  return 0;
+}
+
 // Description: Return -1 for error
 int deleteRoom(Message *packet){
 	int server_port = master_port;
@@ -147,12 +184,20 @@ int joinRoom(Message *packet){
 			\n :delete roomname\
 			\n Example - Enter a colon, your command, and the roomname \n\
 			\n :join room5\n");
+			
+			thread_args* justSD = new thread_args;
+			justSD->sockfds = newsd;
+			pthread_t thread_id=0;
+
+			
+			pthread_create(&thread_id,0, &SocketHandler, (void*)justSD);
+			pthread_detach(thread_id);
     }
 	
 }
 
 //////////////////////////////////////////////////////////////////////////////
-
+// The main thread handles user input and sending messages to the server
 int main(int argc, char* argv[]){
 	int server_port = 7005;
 	int rbufSize; // recieving buffer
@@ -245,7 +290,7 @@ int main(int argc, char* argv[]){
 			     exit(1);
 			 }
 			 printf("Sent bytes %d\n", bytecount);
-
+			 memset(&packet,0,sizeof(packet));
 			 if((bytecount = recv(sd, &packet, packet_length, 0))== -1){
 			     fprintf(stderr, "Error receiving data");
 			     exit(1);
@@ -254,7 +299,7 @@ int main(int argc, char* argv[]){
 				 printf("Request failed!\n");
 			 }
 			 else if (packet.type == 0) {
-			 	printf("Response: %s\n",packet.text);
+				// 	printf("Response: %s\n",packet.text);
 			 }
 			 else if ((packet.type == 1) || packet.type == 2 || packet.type == 3){
 				 printf("Request succeeded!\n");
@@ -265,7 +310,9 @@ int main(int argc, char* argv[]){
 						break;
 					 case 2:
 						printf("Client: Leaving Master Server! Joining room at: %d\n", packet.port);
-						close(sd);
+						// Let's use the main thread to take input and send
+						// Then use another thread to recieve and display from server
+						// close(sd);
 						joinRoom(&packet);
 						break;
 					 case 3:
